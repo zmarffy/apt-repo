@@ -4,4 +4,4 @@
 
 Docs to come in the future.
 
-Needs: A way to remove DEBs from the repo; a way to host multiple repos; a way to guess codename.
+Needs: A way to remove DEBs from the repo; a way to host multiple repos.
