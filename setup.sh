@@ -17,22 +17,6 @@ fi
 
 MOUNT_LOCATION=$(readlink -f $MOUNT_LOCATION)
 
-if [[ -d "${MOUNT_LOCATION}/gpg" ]]; then
-    read -r -p "Repo is already set up; wipe everything and start over? [Y/n] " input
-    case $input in
-        [yY][eE][sS]|[yY])
-            sudo rm -rf $MOUNT_LOCATION/debs_staging/ $MOUNT_LOCATION/gpg/ $MOUNT_LOCATION/repo_files/
-        ;;
-        [nN][oO]|[nN])
-            exit 1
-        ;;
-        *)
-            echo "Invalid input"
-            exit 1
-        ;;
-    esac
-fi
-
 echo "-> Working..."
 
 docker build . -t apt-repo \

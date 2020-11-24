@@ -23,7 +23,7 @@ ENV origin=${origin}
 ENV label=${label}
 ENV codename=${codename}
 ENV arch=${arch}
-ENV components=${components}}
+ENV components=${components}
 ENV description=${description}
 
 ENTRYPOINT ["python3"]
