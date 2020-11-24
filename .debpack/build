@@ -1,0 +1,3 @@
+#! /usr/bin/env bash
+
+mkdir opt/apt-repo/mount -p

@@ -1,0 +1,24 @@
+{
+	"section" : "utils",
+	"priority" : "optional",
+	"maintainer" : {
+		"name" : "Zeke Marffy",
+		"email" : "zmarffy@yahoo.com"
+	},
+	"depends": [
+		"docker.io",
+		"python3"
+	],
+	"description" : "host an APT repo",
+	"build" : {
+		"files" : {
+			"Dockerfile" : "/opt/apt-repo/",
+			"scripts" : "/opt/apt-repo/",
+			"add_debs.sh" : "/opt/apt-repo/add_debs.sh",
+			"serve.sh" : "/opt/apt-repo/serve.sh",
+			"setup.sh" : "/opt/apt-repo/setup.sh",
+			"apt-repo.py": "/usr/bin/apt-repo"
+		}
+	},
+	"architecture_all" : true
+}
