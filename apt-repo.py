@@ -11,14 +11,17 @@ import zmtools
 
 
 def determine_arch(deb_file):
+    # You know I had to do it to 'em ("it" == "copy and paste code from SO and not be bothered to write it in another language")
     if os.path.isfile("determine_arch.sh"):
-        # You know I had to do it to 'em ("it" == "copy and paste code from SO and not be bothered to write it in another language")
         return subprocess.check_output(["./determine_arch.sh", deb_file]).decode().strip()
 
 
 def _deb_file_transform(s):
     d = s.split(".deb:")
     if len(d) != 1:
+        if ":" not in d[1]:
+            add_debs_parser.print_help()
+            add_debs_parser.error(f"Incorrect format for input \"{s}\"")
         d1 = d[1].split(":")
         c = d1[0]
         if c == "":
@@ -152,4 +155,5 @@ elif args.command == "add_debs":
         os.mkdir(os.path.join(MOUNT_LOCATION, "debs_staging"))
 # Need to add removal
 else:
-    raise parser.error("Invalid command")
+    parser.print_help()
+    parser.error("Invalid command")

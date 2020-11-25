@@ -37,7 +37,7 @@ try:
                        check=True, stdout=subprocess.PIPE)
         print(f"Added:\n{s}")
     else:
-        print("Nothing added")
+        print("Nothing added to repo")
 except KeyboardInterrupt:
     print("DEB adding interrupted")
     sys.exit(130)
