@@ -88,7 +88,7 @@ serve_parser.add_argument(
 add_debs_parser = subparsers.add_parser(
     "add_debs", help="add DEBs to the repo")
 add_debs_parser.add_argument("deb_files", nargs="+", type=_deb_file_transform,
-                             help="DEB files to add (either just their locations, or [name]:[component])")
+                             help="DEB files to add (either just their locations, or [location]:[component]:[architecture])")
 add_debs_parser.add_argument("-d", "--delete_original",
                              action="store_true", help="delete the original DEB file")
 
@@ -135,5 +135,6 @@ elif args.command == "add_debs":
     finally:
         shutil.rmtree(os.path.join(MOUNT_LOCATION, "debs_staging"))
         os.mkdir(os.path.join(MOUNT_LOCATION, "debs_staging"))
+# Need to add removal
 else:
     raise parser.error("Invalid command")
