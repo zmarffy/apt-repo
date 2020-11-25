@@ -12,11 +12,11 @@
 	"description" : "host an APT repo",
 	"build" : {
 		"files" : {
-			"Dockerfile" : "/opt/apt-repo/",
-			"scripts" : "/opt/apt-repo/",
-			"add_debs.sh" : "/opt/apt-repo/add_debs.sh",
-			"serve.sh" : "/opt/apt-repo/serve.sh",
-			"setup.sh" : "/opt/apt-repo/setup.sh",
+			"Dockerfile" : "/usr/share/apt-repo/",
+			"scripts" : "/usr/share/apt-repo/",
+			"add_debs.sh" : "/usr/share/apt-repo/add_debs.sh",
+			"serve.sh" : "/usr/share/apt-repo/serve.sh",
+			"setup.sh" : "/usr/share/apt-repo/setup.sh",
 			"apt-repo.py": "/usr/bin/apt-repo"
 		}
 	},

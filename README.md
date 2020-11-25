@@ -4,4 +4,4 @@
 
 Docs to come in the future.
 
-Needs: A way to remove DEBs from the repo; a way to host multiple repos.
+Needs: A way to remove DEBs from the repo; a way to update GPG keys.
