@@ -17,6 +17,7 @@
 			"add_debs.sh" : "/usr/share/apt-repo/add_debs.sh",
 			"serve.sh" : "/usr/share/apt-repo/serve.sh",
 			"setup.sh" : "/usr/share/apt-repo/setup.sh",
+			"determine_arch.sh" : "/usr/share/apt-repo/determine_arch.sh",
 			"apt-repo.py": "/usr/bin/apt-repo"
 		}
 	},

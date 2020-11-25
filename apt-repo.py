@@ -10,6 +10,12 @@ import sys
 import zmtools
 
 
+def determine_arch(deb_file):
+    if os.path.isfile("determine_arch.sh"):
+        # You know I had to do it to 'em ("it" == "copy and paste code from SO and not be bothered to write it in another language")
+        return subprocess.check_output(["./determine_arch.sh", deb_file]).decode().strip()
+
+
 def _deb_file_transform(s):
     d = s.split(".deb:")
     if len(d) != 1:
@@ -25,6 +31,8 @@ def _deb_file_transform(s):
         c = None
         a = None
         f = os.path.abspath(s)
+    if a is None:
+        a = determine_arch(f)
     return f, c, a
 
 
@@ -47,6 +55,7 @@ def wipe_all_if_necessary(mount_location, dotrepos_location):
 
 
 def stage_debs(mount_location, deb_files, delete_original):
+    # Wow, this is wacky!
     if delete_original:
         f = shutil.move
     else:
@@ -58,8 +67,13 @@ def stage_debs(mount_location, deb_files, delete_original):
             fn = deb_file
         if component is None:
             component = input(f"{deb_file} component: ")
+            if component == "":
+                raise ValueError("Empty component")
         if arch is None:
             arch = input(f"{deb_file} architecture: ")
+            if arch == "":
+                # Impossible?
+                raise ValueError("Empty architecture")
         folders = os.path.join(mount_location, "debs_staging", component, arch)
         os.makedirs(folders, exist_ok=True)
         f(deb_file, os.path.join(folders, fn))
@@ -133,6 +147,7 @@ elif args.command == "add_debs":
         subprocess.check_call(
             ["./add_debs.sh", MOUNT_LOCATION, GPG_MOUNT_LOCATION])
     finally:
+        # Cleanup staging folder
         shutil.rmtree(os.path.join(MOUNT_LOCATION, "debs_staging"))
         os.mkdir(os.path.join(MOUNT_LOCATION, "debs_staging"))
 # Need to add removal
