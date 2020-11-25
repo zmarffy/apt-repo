@@ -58,7 +58,6 @@ def wipe_all_if_necessary(mount_location, dotrepos_location):
 
 
 def stage_debs(mount_location, deb_files, delete_original):
-    # Wow, this is wacky!
     if delete_original:
         f = shutil.move
     else:
@@ -77,9 +76,8 @@ def stage_debs(mount_location, deb_files, delete_original):
             if arch == "":
                 # Impossible?
                 raise ValueError("Empty architecture")
-        folders = os.path.join(mount_location, "debs_staging", component, arch)
-        os.makedirs(folders, exist_ok=True)
-        f(deb_file, os.path.join(folders, fn))
+        fn = f"{fn}:{component}:{arch}"
+        f(deb_file, os.path.join(os.path.join(mount_location, "debs_staging"), fn))
 
 
 parser = argparse.ArgumentParser()
@@ -130,6 +128,7 @@ if args.command == "setup":
     if args.splash is not None:
         shutil.copy(args.splash, os.path.join(
             MOUNT_LOCATION, "repo_files", "index.html"))
+    os.makedirs(os.path.join(MOUNT_LOCATION, "debs_staging"), exist_ok=True)
     setup_command = ["./setup.sh", MOUNT_LOCATION, GPG_MOUNT_LOCATION, config["origin"], config["label"],
                      config["codename"], " ".join(config["arch"]), " ".join(config["components"]), config["description"]]
     subprocess.check_call(setup_command)
@@ -145,15 +144,12 @@ elif args.command == "serve":
             subprocess.check_call(
                 ["docker", "container", "stop", container_id], stdout=subprocess.PIPE)
 elif args.command == "add_debs":
-    try:
-        stage_debs(MOUNT_LOCATION, args.deb_files, args.delete_original)
-        subprocess.check_call(
-            ["./add_debs.sh", MOUNT_LOCATION, GPG_MOUNT_LOCATION])
-    finally:
-        # Cleanup staging folder
-        shutil.rmtree(os.path.join(MOUNT_LOCATION, "debs_staging"))
-        os.mkdir(os.path.join(MOUNT_LOCATION, "debs_staging"))
-# Need to add removal
+    stage_debs(MOUNT_LOCATION, args.deb_files, args.delete_original)
+    subprocess.check_call(
+        ["./add_debs.sh", MOUNT_LOCATION, GPG_MOUNT_LOCATION])
+elif args.command == "remove_debs":
+    # Need to add removal
+    raise NotImplementedError()
 else:
     parser.print_help()
     parser.error("Invalid command")
