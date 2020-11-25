@@ -11,14 +11,21 @@ import zmtools
 
 
 def _deb_file_transform(s):
-    d = s.rsplit(".deb:", 1)
-    try:
-        c = d[1]
+    d = s.split(".deb:")
+    if len(d) != 1:
+        d1 = d[1].split(":")
+        c = d1[0]
+        if c == "":
+            c = None
+        a = d1[1]
+        if a == "":
+            a = None
         f = os.path.abspath(d[0] + ".deb")
-    except IndexError:
+    else:
         c = None
-        f = os.path.abspath(d[0])
-    return f, c
+        a = None
+        f = os.path.abspath(s)
+    return f, c, a
 
 
 def wipe_all_if_necessary(mount_location, dotrepos_location):
@@ -44,14 +51,18 @@ def stage_debs(mount_location, deb_files, delete_original):
         f = shutil.move
     else:
         f = shutil.copy
-    for deb_file, component in deb_files:
+    for deb_file, component, arch in deb_files:
         try:
             fn = deb_file.rsplit(os.sep, 1)[1]
         except IndexError:
             fn = deb_file
         if component is None:
             component = input(f"{deb_file} component: ")
-        f(deb_file, os.path.join(mount_location, "debs_staging", component, fn))
+        if arch is None:
+            arch = input(f"{deb_file} architecture: ")
+        folders = os.path.join(mount_location, "debs_staging", component, arch)
+        os.makedirs(folders, exist_ok=True)
+        f(deb_file, os.path.join(folders, fn))
 
 
 parser = argparse.ArgumentParser()
@@ -99,14 +110,9 @@ if args.command == "setup":
     with open(args.config, "r") as f:
         config = json.load(f)
     wipe_all_if_necessary(MOUNT_LOCATION, DOTREPOS_LOCATION)
-    for component in config["components"]:
-        os.makedirs(os.path.join(MOUNT_LOCATION,
-                                 "debs_staging", component), exist_ok=True)
-        os.makedirs(os.path.join(MOUNT_LOCATION,
-                                 "repo_files", component), exist_ok=True)
-        if args.splash is not None:
-            shutil.copy(args.splash, os.path.join(
-                MOUNT_LOCATION, "repo_files", "index.html"))
+    if args.splash is not None:
+        shutil.copy(args.splash, os.path.join(
+            MOUNT_LOCATION, "repo_files", "index.html"))
     setup_command = ["./setup.sh", MOUNT_LOCATION, GPG_MOUNT_LOCATION, config["origin"], config["label"],
                      config["codename"], " ".join(config["arch"]), " ".join(config["components"]), config["description"]]
     subprocess.check_call(setup_command)
@@ -122,8 +128,12 @@ elif args.command == "serve":
             subprocess.check_call(
                 ["docker", "container", "stop", container_id], stdout=subprocess.PIPE)
 elif args.command == "add_debs":
-    stage_debs(MOUNT_LOCATION, args.deb_files, args.delete_original)
-    subprocess.check_call(
-        ["./add_debs.sh", MOUNT_LOCATION, GPG_MOUNT_LOCATION])
+    try:
+        stage_debs(MOUNT_LOCATION, args.deb_files, args.delete_original)
+        subprocess.check_call(
+            ["./add_debs.sh", MOUNT_LOCATION, GPG_MOUNT_LOCATION])
+    finally:
+        shutil.rmtree(os.path.join(MOUNT_LOCATION, "debs_staging"))
+        os.mkdir(os.path.join(MOUNT_LOCATION, "debs_staging"))
 else:
     raise parser.error("Invalid command")
