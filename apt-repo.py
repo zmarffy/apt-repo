@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -11,9 +12,8 @@ import zmtools
 
 
 def determine_arch(deb_file):
-    # You know I had to do it to 'em ("it" == "copy and paste code from SO and not be bothered to write it in another language")
-    if os.path.isfile("determine_arch.sh"):
-        return subprocess.check_output(["./determine_arch.sh", deb_file]).decode().strip()
+    out = subprocess.check_output(["dpkg", "--info", deb_file]).decode()
+    return re.findall("(?<=Architecture: ).+", out)[0]
 
 
 def _deb_file_transform(s):
@@ -118,8 +118,8 @@ elif args.command == "serve":
     else:
         with open(os.path.join(DOTREPOS_LOCATION, "containerid"), "r") as f:
             container_id = f.read().strip()
-            subprocess.check_call(
-                ["docker", "container", "stop", container_id], stdout=subprocess.PIPE)\
+            subprocess.check_output(
+                ["docker", "container", "stop", container_id])
 
 elif args.command == "add_debs":
     deb_data = []
