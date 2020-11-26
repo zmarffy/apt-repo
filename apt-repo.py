@@ -57,29 +57,6 @@ def wipe_all_if_necessary(mount_location, dotrepos_location):
         os.makedirs(dotrepos_location, exist_ok=True)
 
 
-def stage_debs(mount_location, deb_files, delete_original):
-    if delete_original:
-        f = shutil.move
-    else:
-        f = shutil.copy
-    for deb_file, component, arch in deb_files:
-        try:
-            fn = deb_file.rsplit(os.sep, 1)[1]
-        except IndexError:
-            fn = deb_file
-        if component is None:
-            component = input(f"{deb_file} component: ")
-            if component == "":
-                raise ValueError("Empty component")
-        if arch is None:
-            arch = input(f"{deb_file} architecture: ")
-            if arch == "":
-                # Impossible?
-                raise ValueError("Empty architecture")
-        fn = f"{fn}:{component}:{arch}"
-        f(deb_file, os.path.join(os.path.join(mount_location, "debs_staging"), fn))
-
-
 parser = argparse.ArgumentParser()
 
 parser.add_argument("-n", "--name", default="repo",
@@ -104,8 +81,6 @@ add_debs_parser = subparsers.add_parser(
     "add_debs", help="add DEBs to the repo")
 add_debs_parser.add_argument("deb_files", nargs="+", type=_deb_file_transform,
                              help="DEB files to add (either just their locations, or [location]:[component]:[architecture])")
-add_debs_parser.add_argument("-d", "--delete_original",
-                             action="store_true", help="delete the original DEB file")
 
 args = parser.parse_args()
 
@@ -113,6 +88,7 @@ NAME = args.name
 BASE_SCRIPTS_LOCATION = os.path.join(os.sep, "usr", "share", "apt-repo")
 BASE_LOCATION = os.path.join(os.sep, "opt", "apt-repo")
 MOUNT_LOCATION = os.path.join(BASE_LOCATION, NAME)
+DEBS_STAGING_LOCATION = os.path.join(MOUNT_LOCATION, "debs_staging")
 GPG_MOUNT_LOCATION = os.path.join(BASE_LOCATION, "gpg")
 DOTREPOS_LOCATION = os.path.join(BASE_LOCATION, ".repos", NAME)
 
@@ -128,10 +104,11 @@ if args.command == "setup":
     if args.splash is not None:
         shutil.copy(args.splash, os.path.join(
             MOUNT_LOCATION, "repo_files", "index.html"))
-    os.makedirs(os.path.join(MOUNT_LOCATION, "debs_staging"), exist_ok=True)
+    os.makedirs(DEBS_STAGING_LOCATION, exist_ok=True)
     setup_command = ["./setup.sh", MOUNT_LOCATION, GPG_MOUNT_LOCATION, config["origin"], config["label"],
                      config["codename"], " ".join(config["arch"]), " ".join(config["components"]), config["description"]]
     subprocess.check_call(setup_command)
+
 elif args.command == "serve":
     if not args.stop:
         container_id = subprocess.check_output(
@@ -142,14 +119,41 @@ elif args.command == "serve":
         with open(os.path.join(DOTREPOS_LOCATION, "containerid"), "r") as f:
             container_id = f.read().strip()
             subprocess.check_call(
-                ["docker", "container", "stop", container_id], stdout=subprocess.PIPE)
+                ["docker", "container", "stop", container_id], stdout=subprocess.PIPE)\
+
 elif args.command == "add_debs":
-    stage_debs(MOUNT_LOCATION, args.deb_files, args.delete_original)
-    subprocess.check_call(
-        ["./add_debs.sh", MOUNT_LOCATION, GPG_MOUNT_LOCATION])
+    deb_data = []
+    deb_file_locations = []
+    for deb_file, component, arch in args.deb_files:
+        try:
+            fn = deb_file.rsplit(os.sep, 1)[1]
+        except IndexError:
+            fn = deb_file
+        if component is None:
+            component = input(f"{deb_file} component: ")
+            if component == "":
+                raise ValueError("Empty component")
+        if arch is None:
+            arch = input(f"{deb_file} architecture: ")
+            if arch == "":
+                # Impossible?
+                raise ValueError("Empty architecture")
+        deb_file_location = os.path.join(DEBS_STAGING_LOCATION, fn)
+        print(deb_file_location)
+        shutil.copy(deb_file, deb_file_location)
+        deb_data.append(f"{fn}:{component}:{arch}")
+        deb_file_locations.append(deb_file_location)
+    try:
+        subprocess.check_call(
+            ["./add_debs.sh", MOUNT_LOCATION, GPG_MOUNT_LOCATION] + deb_data)
+    finally:
+        for f in deb_file_locations:
+            os.remove(f)
+
 elif args.command == "remove_debs":
     # Need to add removal
     raise NotImplementedError()
+
 else:
     parser.print_help()
     parser.error("Invalid command")
