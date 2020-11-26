@@ -34,7 +34,7 @@
     }
     ```
 
-    *Note: Do not specify "`all`" as an architecture here, even if you have packages that fit all architectures.*
+    **Note:** Do not specify "`all`" as an architecture here, even if you have packages that fit all architectures.
 
 3. Add some DEB files to the repo.
 
@@ -42,7 +42,7 @@
     apt-repo [-h] [-n NAME] add_debs [-h] [-d] deb_files [deb_files ...]
     ```
 
-    *Note: You can specify DEB files with just their filenames, or like "`[location]:[component]:[architecture]`"; for example: "`mydeb_1.0.0-1_all.deb:main:all`". You can specify just one of the variables so long as you have both colons. Architecture will be determined automatically if you do not specify it (by reading packages' actual architecture fields; not by assuming from their names).*
+    **Note:** You can specify DEB files with just their filenames, or like "`[location]:[component]:[architecture]`"; for example: "`mydeb_1.0.0-1_all.deb:main:all`". You can specify just one of the variables so long as you have both colons. Architecture will be determined automatically if you do not specify it (by reading packages' actual architecture fields; not by assuming from their names).
 
 4. Serve the repo.
 
