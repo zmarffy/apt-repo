@@ -139,7 +139,6 @@ elif args.command == "add_debs":
                 # Impossible?
                 raise ValueError("Empty architecture")
         deb_file_location = os.path.join(DEBS_STAGING_LOCATION, fn)
-        print(deb_file_location)
         shutil.copy(deb_file, deb_file_location)
         deb_data.append(f"{fn}:{component}:{arch}")
         deb_file_locations.append(deb_file_location)

@@ -26,8 +26,6 @@ try:
             if arch == all_arch:
                 arch = "all"
             added_debs.append((deb_file_name, component, arch))
-            # Delete from staging area
-            os.remove(deb_file_location)
         except subprocess.CalledProcessError as e:
             print(e)
 
