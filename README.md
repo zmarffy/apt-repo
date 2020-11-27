@@ -7,12 +7,13 @@
 - `docker`
 - `gpg`
 - `python3`
+- `python-magic` (a `pip` package)
+- `pyyaml` (a `pip` package)
 - `zmtools` (a `pip` package)
 
 ## Setup
 
-1. Install the DEB package
-2. Run `apt-repo setup`. Usage is as follows.
+1. Run `apt-repo setup`. Usage is as follows.
 
     ```text
     usage: apt-repo [-h] [-n NAME] setup [-h] [--splash SPLASH] config
@@ -37,7 +38,7 @@
 
     **Note:** Do not specify "`all`" as an architecture here, even if you have packages that fit all architectures.
 
-3. Add some DEB files to the repo.
+2. Add some DEB files to the repo.
 
     ```text
     apt-repo [-h] [-n NAME] add_debs [-h] [-d] deb_files [deb_files ...]
@@ -45,7 +46,7 @@
 
     **Note:** You can specify DEB files with just their filenames, or like "`[location]:[component]:[architecture]`"; for example: "`mydeb_1.0.0-1_all.deb:main:all`". You can specify just one of the variables so long as you have both colons. Architecture will be determined automatically if you do not specify it (by reading packages' actual architecture fields; not by assuming from their names).
 
-4. Serve the repo.
+3. Serve the repo.
 
     ```text
     apt-repo [-h] [-n NAME] serve [-h] [-p PORT] [-s]
