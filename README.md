@@ -1,10 +1,11 @@
 # `apt-repo`
 
-`apt-repo` very oddly-structured program to create and host a repo on your computer. It was originally structured like this to keep things as as dependency-free as possible, as Docker is used for the main functionailty. This should be built and installed with [`debpacker`](https://github.com/zmarffy/debpacker).
+`apt-repo` is a program to create and host an APT repo on your computer.
 
 ## Requirements
 
 - `docker`
+- `gpg`
 - `python3`
 - `zmtools` (a `pip` package)
 

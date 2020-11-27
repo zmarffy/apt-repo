@@ -7,7 +7,9 @@
 	},
 	"depends": [
 		"docker.io",
-		"python3"
+		"python3",
+		"gpg",
+		"reprepro"
 	],
 	"description" : "host an APT repo",
 	"build" : {
@@ -15,8 +17,6 @@
 			"Dockerfile" : "/usr/share/apt-repo/",
 			"scripts" : "/usr/share/apt-repo/",
 			"add_debs.sh" : "/usr/share/apt-repo/add_debs.sh",
-			"serve.sh" : "/usr/share/apt-repo/serve.sh",
-			"setup.sh" : "/usr/share/apt-repo/setup.sh",
 			"apt-repo.py": "/usr/bin/apt-repo"
 		}
 	},
