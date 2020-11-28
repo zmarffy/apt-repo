@@ -140,12 +140,13 @@ def main():
     REPO_FILES_LOCATION = os.path.join(REPO_LOCATION, "repo_files")
     DOTREPOS_LOCATION = os.path.join(BASE_LOCATION, ".repos", NAME)
 
-    with open(os.path.join(REPO_FILES_LOCATION, "conf", "distributions"), "r") as f:
-        distributions_text = f.read()
+    if args.command != "setup":
+        with open(os.path.join(REPO_FILES_LOCATION, "conf", "distributions"), "r") as f:
+            distributions_text = f.read()
 
-    CODENAME = re.findall(r"(?<=Codename: ).+", distributions_text)[0]
-    ALL_ARCH = re.findall(r"(?<=Architectures: ).+",
-                          distributions_text)[0].replace(" ", "|")
+        CODENAME = re.findall(r"(?<=Codename: ).+", distributions_text)[0]
+        ALL_ARCH = re.findall(r"(?<=Architectures: ).+",
+                            distributions_text)[0].replace(" ", "|")
 
     if args.command == "setup":
         # Completely wipe the repo if the user wants to
