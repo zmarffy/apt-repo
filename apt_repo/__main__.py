@@ -11,8 +11,12 @@ import uuid
 
 import magic
 from reequirements import Requirement
+from tabulate import tabulate
 import yaml
 import zmtools
+
+LIST_OUTPUT_KEYS = ("codename", "component", "arch", "name", "version")
+
 
 REQUIREMENTS = [
     Requirement("docker", ["docker", "-v"]),
@@ -25,6 +29,9 @@ for requirement in REQUIREMENTS:
 
 
 def main():
+
+    def list_debs_available(codename, repo_files_location):
+        return [dict(zip(LIST_OUTPUT_KEYS, p)) for p in [b[0].split("|") + b[1].split(" ", 1) for b in [d0.split(": ", 1) for d0 in subprocess.check_output(["reprepro", "-b", repo_files_location, "list", codename]).decode().strip().split("\n")]]]
 
     def determine_arch(deb_file):
         out = subprocess.check_output(["dpkg", "--info", deb_file]).decode()
@@ -64,8 +71,8 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-n", "--name", default="repo",
-                        help="repo name (overridden by config's \"name\" key)")
+    parser.add_argument(
+        "-n", "--name", help="repo name (overridden by config's \"name\" key)")
 
     subparsers = parser.add_subparsers(dest="command", help="action to take")
 
@@ -88,9 +95,19 @@ def main():
     add_debs_parser.add_argument("deb_files", nargs="+", type=_deb_file_transform,
                                  help="DEB files to add (either just their locations, or [location]:[component]:[architecture])")
 
+    list_debs_parser = subparsers.add_parser(
+        "list_debs", help="list DEBs in the repo")
+    list_debs_parser.add_argument(
+        "--pretty", action="store_true", help="pretty-print")
+
     args = parser.parse_args()
 
+    if args.command is None:
+        parser.print_help()
+        parser.error("Need to specify a command")
+
     NAME = args.name
+    name_from_config = False
     if args.command == "setup":
         with open(args.config, "r") as f:
             if magic.from_file(args.config).endswith("json"):
@@ -99,15 +116,36 @@ def main():
                 # Why not?
                 config = yaml.load(f, Loader=yaml.FullLoader)
         try:
+            # Ignore -n
             NAME = config["name"]
+            name_from_config = True
         except KeyError:
             pass
 
     BASE_LOCATION = os.path.join(os.path.expanduser("~"), "apt-repo")
+
+    if args.command != "setup":
+        if not os.path.isdir(BASE_LOCATION):
+            raise FileNotFoundError(
+                f"{BASE_LOCATION} does not exist; please run apt-repo setup first")
+
+    if not name_from_config and NAME is None:
+        # If only using one repo, use that as NAME
+        files = os.listdir(BASE_LOCATION)
+        files.remove(".repos")
+        if len(files) == 1:
+            NAME = files[0]
+
     REPO_LOCATION = os.path.join(BASE_LOCATION, NAME)
     REPO_FILES_LOCATION = os.path.join(REPO_LOCATION, "repo_files")
-    GPG_FOLDER_LOCATION = os.path.join(BASE_LOCATION, "gpg")
     DOTREPOS_LOCATION = os.path.join(BASE_LOCATION, ".repos", NAME)
+
+    with open(os.path.join(REPO_FILES_LOCATION, "conf", "distributions"), "r") as f:
+        distributions_text = f.read()
+
+    CODENAME = re.findall(r"(?<=Codename: ).+", distributions_text)[0]
+    ALL_ARCH = re.findall(r"(?<=Architectures: ).+",
+                          distributions_text)[0].replace(" ", "|")
 
     if args.command == "setup":
         # Completely wipe the repo if the user wants to
@@ -187,38 +225,43 @@ SignWith: {}
                     ["docker", "container", "stop", container_id])
 
     elif args.command == "add_debs":
-        with open(os.path.join(REPO_FILES_LOCATION, "conf", "distributions"), "r") as f:
-            distributions_text = f.read()
-        codename = re.findall(r"(?<=Codename: ).+", distributions_text)[0]
-        all_arch = re.findall(r"(?<=Architectures: ).+",
-                              distributions_text)[0].replace(" ", "|")
-        added_debs = []
+        if not os.path.isdir(os.path.join(REPO_FILES_LOCATION, "db")):
+            # First time run edge case
+            original_debs_list = []
+        else:
+            original_debs_list = list_debs_available(
+                CODENAME, REPO_FILES_LOCATION)
         for deb_file, component, arch in args.deb_files:
             if arch == "all":
-                arch = all_arch
+                arch = ALL_ARCH
             try:
-                subprocess.check_output(["reprepro", "--ask-passphrase", "-C", component,
-                                         "-A", arch, "-Vb", REPO_FILES_LOCATION, "includedeb", codename, deb_file])
-                if arch == all_arch:
+                subprocess.check_call(["reprepro", "--ask-passphrase", "-C", component,
+                                       "-A", arch, "-Vb", REPO_FILES_LOCATION, "includedeb", CODENAME, deb_file])
+                if arch == ALL_ARCH:
                     arch = "all"
-                added_debs.append((deb_file, component, arch))
             except subprocess.CalledProcessError as e:
                 print(e)
-
-        if added_debs:
-            # Make this a pretty table or something maybe?
-            s = ""
-            for added_deb in added_debs:
-                s += f"{added_deb[0]} ({added_deb[1]} / {added_deb[2]})\n"
-            subprocess.check_output(
-                ["reprepro", "-b", REPO_FILES_LOCATION, "export"])
-            print(f"Added:\n{s.strip()}")
+        all_debs_list = list_debs_available(CODENAME, REPO_FILES_LOCATION)
+        new_debs_list = [
+            deb for deb in all_debs_list if deb not in original_debs_list]
+        if new_debs_list:
+            print()
+            print("New DEBs added")
+            print(tabulate(new_debs_list, headers="keys"))
         else:
-            print("Nothing added to repo")
+            print("No new DEBs added")
 
     elif args.command == "remove_debs":
         # Need to add removal
         raise NotImplementedError()
+
+    elif args.command == "list_debs":
+        debs = list_debs_available(CODENAME, REPO_FILES_LOCATION)
+        if args.pretty:
+            print(tabulate(debs, headers="keys"))
+        else:
+            for deb in debs:
+                print(" ".join([v for v in deb.values()]).strip())
 
     else:
         parser.print_help()

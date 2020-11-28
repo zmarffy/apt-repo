@@ -57,6 +57,5 @@
 ## Missing features
 
 - HTTPS and auth
-- Listing DEBs
 - Removing DEBs
-- Renewing one's GPG key
+- Renewing one's GPG key/switching which key the repo is signed with
