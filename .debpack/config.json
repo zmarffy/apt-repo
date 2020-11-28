@@ -7,8 +7,8 @@
 	},
 	"depends": [
 		"docker.io",
-		"python3 >= 3.6",
-		"gpg >= 2",
+		"python3>=3.6",
+		"gpg>=2",
 		"reprepro"
 	],
 	"description" : "host APT repos",
