@@ -31,13 +31,21 @@ for requirement in REQUIREMENTS:
 def main():
 
     def list_debs_available(codename, repo_files_location):
-        return [dict(zip(LIST_OUTPUT_KEYS, p)) for p in [b[0].split("|") + b[1].split(" ", 1) for b in [d0.split(": ", 1) for d0 in subprocess.check_output(["reprepro", "-b", repo_files_location, "list", codename]).decode().strip().split("\n")]]]
+        # Literal magic
+        o = subprocess.check_output(
+            ["reprepro", "-b", repo_files_location, "list", codename]).decode().strip().split("\n")
+        if o == [""]:
+            return []
+        else:
+            return [dict(zip(LIST_OUTPUT_KEYS, p)) for p in [b[0].split("|") + b[1].split(" ", 1) for b in [d0.split(": ", 1) for d0 in o]]]
 
     def determine_arch(deb_file):
+        # Not magic
         out = subprocess.check_output(["dpkg", "--info", deb_file]).decode()
         return re.findall("(?<=Architecture: ).+", out)[0]
 
     def _deb_file_transform(s):
+        # More magic
         d = s.split(".deb:")
         if len(d) != 1:
             if ":" not in d[1]:
@@ -73,6 +81,8 @@ def main():
 
     parser.add_argument(
         "-n", "--name", help="repo name (overridden by config's \"name\" key)")
+    parser.add_argument("-l", "--base_location", default=os.path.join(
+        os.path.expanduser("~"), "apt-repo"), help="base location for reprepro data")
 
     subparsers = parser.add_subparsers(dest="command", help="action to take")
 
@@ -122,7 +132,7 @@ def main():
         except KeyError:
             pass
 
-    BASE_LOCATION = os.path.join(os.path.expanduser("~"), "apt-repo")
+    BASE_LOCATION = args.base_location
 
     if args.command != "setup":
         if not os.path.isdir(BASE_LOCATION):
@@ -132,13 +142,13 @@ def main():
     if not name_from_config and NAME is None:
         # If only using one repo, use that as NAME
         files = os.listdir(BASE_LOCATION)
-        files.remove(".repos")
         if len(files) == 1:
             NAME = files[0]
 
     REPO_LOCATION = os.path.join(BASE_LOCATION, NAME)
     REPO_FILES_LOCATION = os.path.join(REPO_LOCATION, "repo_files")
-    DOTREPOS_LOCATION = os.path.join(BASE_LOCATION, ".repos", NAME)
+    DOTAPTREPO_LOCATION = os.path.join(
+        os.path.expanduser("~"), ".apt-repo", NAME)
 
     if args.command != "setup":
         with open(os.path.join(REPO_FILES_LOCATION, "conf", "distributions"), "r") as f:
@@ -146,7 +156,7 @@ def main():
 
         CODENAME = re.findall(r"(?<=Codename: ).+", distributions_text)[0]
         ALL_ARCH = re.findall(r"(?<=Architectures: ).+",
-                            distributions_text)[0].replace(" ", "|")
+                              distributions_text)[0].replace(" ", "|")
 
     if args.command == "setup":
         # Completely wipe the repo if the user wants to
@@ -156,14 +166,15 @@ def main():
             setup_already = False
         if setup_already:
             if zmtools.y_to_continue(f"Repo already set up at {REPO_LOCATION}; wipe and start over? (y/n)") and zmtools.y_to_continue("Are you REALLY sure you want to wipe the repo? There is no going back from this. (y/n)"):
+                # If this doesn't work, it's probably not your repo :)
                 shutil.rmtree(REPO_LOCATION)
-                shutil.rmtree(DOTREPOS_LOCATION)
+                shutil.rmtree(DOTAPTREPO_LOCATION)
             else:
                 sys.exit("Setup aborted")
         # Make necessary directories if necessary
         os.makedirs(REPO_LOCATION, exist_ok=True)
         os.makedirs(REPO_FILES_LOCATION, exist_ok=True)
-        os.makedirs(DOTREPOS_LOCATION, exist_ok=True)
+        os.makedirs(DOTAPTREPO_LOCATION, exist_ok=True)
         # Copy the splash page
         if args.splash is not None:
             shutil.copy(args.splash, os.path.join(
@@ -217,10 +228,10 @@ SignWith: {}
         if not args.stop:
             container_id = subprocess.check_output(
                 ["docker", "run", "--rm", "-d", "--name", f"apt-repo_{NAME}", "-p", f"{args.port}:80", "-v", f"{REPO_FILES_LOCATION}:{os.path.join(os.sep, 'usr', 'local', 'apache2', 'htdocs')}", "httpd"]).decode().strip()
-            with open(os.path.join(DOTREPOS_LOCATION, "containerid"), "w") as f:
+            with open(os.path.join(DOTAPTREPO_LOCATION, "containerid"), "w") as f:
                 f.write(container_id)
         else:
-            with open(os.path.join(DOTREPOS_LOCATION, "containerid"), "r") as f:
+            with open(os.path.join(DOTAPTREPO_LOCATION, "containerid"), "r") as f:
                 container_id = f.read().strip()
                 subprocess.check_output(
                     ["docker", "container", "stop", container_id])
@@ -258,11 +269,14 @@ SignWith: {}
 
     elif args.command == "list_debs":
         debs = list_debs_available(CODENAME, REPO_FILES_LOCATION)
-        if args.pretty:
-            print(tabulate(debs, headers="keys"))
+        if debs:
+            if args.pretty:
+                print(tabulate(debs, headers="keys"))
+            else:
+                for deb in debs:
+                    print(" ".join([v for v in deb.values()]).strip())
         else:
-            for deb in debs:
-                print(" ".join([v for v in deb.values()]).strip())
+            print(f"No DEBs in repo \"{NAME}\" yet")
 
     else:
         parser.print_help()
