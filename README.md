@@ -1,6 +1,6 @@
 # `apt-repo`
 
-`apt-repo` is a program to create and host an APT repo on your computer.
+`apt-repo` is a program to create and host an APT repo on your server or GitHub.
 
 ## Requirements
 
@@ -20,7 +20,7 @@
     usage: apt-repo [-h] [-n NAME] [-l BASE_LOCATION] setup [-h] [--splash SPLASH] config
     ```
 
-    You may select a name for your repo or leave it blank for the default, "repo". This is what allows you to serve multiple repos on one server. You may also add an HTML splash page if you'd like. A config file is the only required parameter, though. Here is an example of one.
+    You may select a name for your repo or leave it blank for the default, "repo". This is what allows you to serve multiple repos on one server. You may also add an HTML splash page if you'd like. A JSON or YAML config file is the only required parameter, though. Here is an example of one.
 
     ```json
     {
@@ -38,7 +38,7 @@
     }
     ```
 
-    Using "`github-public`" or "`github-private`" as "`host`" will create a repo on GitHub to host your repo in.
+    Using "`github-public`" or "`github-private`" as "`host`" will create a repo on GitHub to host your APT repo in. Yes, this is weird. Yes, it works.
 
     **Note:** Do not specify "`all`" as an architecture here, even if you have packages that fit all architectures.
 

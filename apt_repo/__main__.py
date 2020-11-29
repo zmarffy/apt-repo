@@ -35,9 +35,6 @@ REQUIREMENTS = [
     Requirement("GitHub CLI", ["gh", "--version"])
 ]
 
-for requirement in REQUIREMENTS:
-    requirement.check()
-
 
 def list_debs_available(codename, repo_files_location):
     # Literal magic
@@ -292,6 +289,8 @@ SignWith: {}
             original_debs_list = list_debs_available(
                 CODENAME, REPO_FILES_LOCATION)
         for deb_file, component, arch in args.deb_files:
+            if os.stat(deb_file).st_size > 10000000 and not SETTINGS["local"]:
+                print(f"WARNING: {deb_file} exceeds 100 MB; cannot add to repo")
             if arch == "all":
                 arch = ALL_ARCH
             try:
@@ -340,4 +339,6 @@ SignWith: {}
 
 
 if __name__ == "__main__":
+    for requirement in REQUIREMENTS:
+        requirement.check()
     sys.exit(main())
