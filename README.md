@@ -77,3 +77,4 @@
 - HTTPS and auth for local repos
 - Removing DEBs
 - Renewing one's GPG key/switching which key the repo is signed with
+- Correct splash page support when hosted on GitHub
