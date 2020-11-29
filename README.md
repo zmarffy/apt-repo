@@ -38,7 +38,7 @@
     }
     ```
 
-    Using "`github-public`" or `"github-private"` as "`host`" will create a repo on GitHub to host your repo in.
+    Using "`github-public`" or "`github-private`" as "`host`" will create a repo on GitHub to host your repo in.
 
     **Note:** Do not specify "`all`" as an architecture here, even if you have packages that fit all architectures.
 
