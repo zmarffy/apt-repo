@@ -5,6 +5,7 @@
 ## Requirements
 
 - `docker`
+- `gh`
 - `gpg`
 - `python3`
 - `python-magic` (a `pip` package)
@@ -32,9 +33,12 @@
         "components": [
             "main"
         ],
-        "description": "Zeke's APT repo of random stuff he makes"
+        "description": "Zeke's APT repo of random stuff he makes",
+        "host": "local"
     }
     ```
+
+    Using "`github-public`" or `"github-private"` as "`host`" will create a repo on GitHub to host your repo in.
 
     **Note:** Do not specify "`all`" as an architecture here, even if you have packages that fit all architectures.
 
@@ -54,7 +58,7 @@
 
     The `-s` flag stops the repo from being served.
 
-## Other tuff you can do
+## Other stuff you can do
 
 - List the files in the repo
 
@@ -70,6 +74,6 @@
 
 ## Missing features
 
-- HTTPS and auth
+- HTTPS and auth for local repos
 - Removing DEBs
 - Renewing one's GPG key/switching which key the repo is signed with

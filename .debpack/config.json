@@ -9,7 +9,8 @@
 		"docker.io",
 		"python3 (>= 3.6)",
 		"gpg (>= 2)",
-		"reprepro"
+		"reprepro",
+		"gh"
 	],
 	"description" : "host APT repos",
 	"build" : {
