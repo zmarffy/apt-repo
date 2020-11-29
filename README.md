@@ -64,7 +64,9 @@
 
 ## Tips
 
-- Why not host your repo on an Amazon S3 bucket? Mount it to your computer using `s3fs`. You can even [enable auth](https://stackoverflow.com/questions/3091084/does-amazon-s3-support-http-request-with-basic-authentication)
+- Why not host your repo on an Amazon S3 bucket? Mount it to your computer using [`s3fs`](http://manpages.ubuntu.com/manpages/xenial/man1/s3fs.1.html). You can even [enable auth](https://stackoverflow.com/questions/3091084/does-amazon-s3-support-http-request-with-basic-authentication) if you do that
+
+- Why not completely avoid spending money and use the "host-on-GitHub" feature
 
 ## Missing features
 

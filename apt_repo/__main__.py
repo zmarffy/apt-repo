@@ -10,13 +10,23 @@ import sys
 import uuid
 
 import magic
-from reequirements import Requirement
-from tabulate import tabulate
 import yaml
 import zmtools
+from reequirements import Requirement
+from tabulate import tabulate
 
-LIST_OUTPUT_KEYS = ("codename", "component", "arch", "name", "version")
-
+LIST_OUTPUT_KEYS = (
+    "codename",
+    "component",
+    "arch",
+    "name",
+    "version"
+)
+VALID_HOSTS = (
+    "local",
+    "github-public",
+    "github-private"
+)
 
 REQUIREMENTS = [
     Requirement("docker", ["docker", "-v"]),
@@ -28,21 +38,25 @@ for requirement in REQUIREMENTS:
     requirement.check()
 
 
+def list_debs_available(codename, repo_files_location):
+    # Literal magic
+    o = subprocess.check_output(
+        ["reprepro", "-b", repo_files_location, "list", codename]).decode().strip()
+    if o == "":
+        # No debs
+        return []
+    else:
+        # Parse the output and return a list of dicts
+        return [dict(zip(LIST_OUTPUT_KEYS, p)) for p in [b[0].split("|") + b[1].split(" ", 1) for b in [d0.split(": ", 1) for d0 in o.split("\n")]]]
+
+
+def determine_arch(deb_file):
+    # Not magic
+    out = subprocess.check_output(["dpkg", "--info", deb_file]).decode()
+    return re.findall("(?<=Architecture: ).+", out)[0]
+
+
 def main():
-
-    def list_debs_available(codename, repo_files_location):
-        # Literal magic
-        o = subprocess.check_output(
-            ["reprepro", "-b", repo_files_location, "list", codename]).decode().strip().split("\n")
-        if o == [""]:
-            return []
-        else:
-            return [dict(zip(LIST_OUTPUT_KEYS, p)) for p in [b[0].split("|") + b[1].split(" ", 1) for b in [d0.split(": ", 1) for d0 in o]]]
-
-    def determine_arch(deb_file):
-        # Not magic
-        out = subprocess.check_output(["dpkg", "--info", deb_file]).decode()
-        return re.findall("(?<=Architecture: ).+", out)[0]
 
     def _deb_file_transform(s):
         # More magic
@@ -89,7 +103,7 @@ def main():
     setup_parser = subparsers.add_parser(
         "setup", help="setup the repo for the first time")
     setup_parser.add_argument("config", type=os.path.abspath,
-                              help="config.json file location")
+                              help="config json/yaml file location")
     setup_parser.add_argument("--splash", type=os.path.abspath,
                               help="HTML splash page location")
 
@@ -125,6 +139,10 @@ def main():
             else:
                 # Why not?
                 config = yaml.load(f, Loader=yaml.FullLoader)
+        # Validate settings
+        if config["host"] not in VALID_HOSTS:
+            raise ValueError(
+                f"Invalid value \"{config['host']}\" for key \"host\"")
         try:
             # Ignore -n
             NAME = config["name"]
@@ -145,10 +163,11 @@ def main():
         if len(files) == 1:
             NAME = files[0]
 
-    REPO_LOCATION = os.path.join(BASE_LOCATION, NAME)
-    REPO_FILES_LOCATION = os.path.join(REPO_LOCATION, "repo_files")
+    REPO_FILES_LOCATION = os.path.join(BASE_LOCATION, NAME)
     DOTAPTREPO_LOCATION = os.path.join(
         os.path.expanduser("~"), ".apt-repo", NAME)
+    REPO_SETTINGS_LOCATION = os.path.join(
+        DOTAPTREPO_LOCATION, "settings.yaml")
 
     if args.command != "setup":
         with open(os.path.join(REPO_FILES_LOCATION, "conf", "distributions"), "r") as f:
@@ -158,23 +177,30 @@ def main():
         ALL_ARCH = re.findall(r"(?<=Architectures: ).+",
                               distributions_text)[0].replace(" ", "|")
 
+        with open(REPO_SETTINGS_LOCATION, "r") as f:
+            SETTINGS = yaml.load(f, Loader=yaml.FullLoader)
+
     if args.command == "setup":
         # Completely wipe the repo if the user wants to
         try:
-            setup_already = bool(os.listdir(REPO_LOCATION))
+            setup_already = bool(os.listdir(REPO_FILES_LOCATION))
         except FileNotFoundError:
             setup_already = False
         if setup_already:
-            if zmtools.y_to_continue(f"Repo already set up at {REPO_LOCATION}; wipe and start over? (y/n)") and zmtools.y_to_continue("Are you REALLY sure you want to wipe the repo? There is no going back from this. (y/n)"):
+            if zmtools.y_to_continue(f"Repo already set up at {REPO_FILES_LOCATION}; wipe and start over? (y/n)") and zmtools.y_to_continue("Are you REALLY sure you want to wipe the repo? There is no going back from this. (y/n)"):
                 # If this doesn't work, it's probably not your repo :)
-                shutil.rmtree(REPO_LOCATION)
+                shutil.rmtree(REPO_FILES_LOCATION)
                 shutil.rmtree(DOTAPTREPO_LOCATION)
             else:
                 sys.exit("Setup aborted")
         # Make necessary directories if necessary
-        os.makedirs(REPO_LOCATION, exist_ok=True)
         os.makedirs(REPO_FILES_LOCATION, exist_ok=True)
         os.makedirs(DOTAPTREPO_LOCATION, exist_ok=True)
+        SETTINGS = {
+            "local": config["host"] == "local"
+        }
+        with open(REPO_SETTINGS_LOCATION, "w") as f:
+            f.write(yaml.dump(SETTINGS))
         # Copy the splash page
         if args.splash is not None:
             shutil.copy(args.splash, os.path.join(
@@ -223,18 +249,39 @@ SignWith: {}
         with open(os.path.join(REPO_FILES_LOCATION, "conf", "distributions"), "w") as f:
             f.write(distributions_string.format(config["origin"], config["label"], config["codename"], " ".join(
                 config["arch"]), " ".join(config["components"]), config["description"], key))
+        if config["host"] != "local":
+            repo_type = config["host"].split("-")[1]
+            print("WARNING: You are using GitHub to host your repo; your files must not exceed 100 MB and the entire repo must not exceed 100 GB")
+            os.chdir(BASE_LOCATION)
+            subprocess.check_call(
+                ["gh", "repo", "create", NAME, f"--{repo_type}", "-y"])
+            os.chdir(REPO_FILES_LOCATION)
+            subprocess.check_call(["git", "add", "--all"])
+            subprocess.check_call(
+                ["git", "commit", "-m", "set up repo", "-a"])
+            subprocess.check_call(["git", "push", "origin", "master"])
 
     elif args.command == "serve":
-        if not args.stop:
-            container_id = subprocess.check_output(
-                ["docker", "run", "--rm", "-d", "--name", f"apt-repo_{NAME}", "-p", f"{args.port}:80", "-v", f"{REPO_FILES_LOCATION}:{os.path.join(os.sep, 'usr', 'local', 'apache2', 'htdocs')}", "httpd"]).decode().strip()
-            with open(os.path.join(DOTAPTREPO_LOCATION, "containerid"), "w") as f:
-                f.write(container_id)
-        else:
-            with open(os.path.join(DOTAPTREPO_LOCATION, "containerid"), "r") as f:
-                container_id = f.read().strip()
+        if SETTINGS["local"]:
+            if not args.stop:
+                if os.path.isfile(os.path.join(DOTAPTREPO_LOCATION, "containerid")):
+                    raise ValueError("Repo currently being served")
+                container_id = subprocess.check_output(
+                    ["docker", "run", "--rm", "-d", "--name", f"apt-repo_{NAME}", "-p", f"{args.port}:80", "-v", f"{REPO_FILES_LOCATION}:{os.path.join(os.sep, 'usr', 'local', 'apache2', 'htdocs')}", "httpd"]).decode().strip()
+                with open(os.path.join(DOTAPTREPO_LOCATION, "containerid"), "w") as f:
+                    f.write(container_id)
+            else:
+                try:
+                    with open(os.path.join(DOTAPTREPO_LOCATION, "containerid"), "r") as f:
+                        container_id = f.read().strip()
+                except FileNotFoundError:
+                    raise ValueError(
+                        "Repo not currently being served") from None
                 subprocess.check_output(
                     ["docker", "container", "stop", container_id])
+                os.remove(os.path.join(DOTAPTREPO_LOCATION, "containerid"))
+        else:
+            raise ValueError("Cannot serve this repo locally")
 
     elif args.command == "add_debs":
         if not os.path.isdir(os.path.join(REPO_FILES_LOCATION, "db")):
@@ -260,6 +307,13 @@ SignWith: {}
             print()
             print("New DEBs added")
             print(tabulate(new_debs_list, headers="keys"))
+            if not SETTINGS["local"]:
+                # Push to GitHub
+                os.chdir(REPO_FILES_LOCATION)
+                subprocess.check_call(["git", "add", "--all"])
+                subprocess.check_call(
+                    ["git", "commit", "-m", "update repo", "-a"])
+                subprocess.check_call(["git", "push", "origin", "master"])
         else:
             print("No new DEBs added")
 
