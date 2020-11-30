@@ -39,7 +39,7 @@ REQUIREMENTS = [
 LOGGER = logging.getLogger()
 
 
-def list_debs_available(codename, repo_files_location):
+def list_packages_available(codename, repo_files_location):
     # Literal magic
     o = subprocess.check_output(
         ["reprepro", "-b", repo_files_location, "list", codename]).decode().strip()
@@ -66,8 +66,8 @@ def main():
         d = s.split(".deb:")
         if len(d) != 1:
             if ":" not in d[1]:
-                add_debs_parser.print_help()
-                add_debs_parser.error(
+                add_packages_parser.print_help()
+                add_packages_parser.error(
                     f"Incorrect format for input \"{s}\" (use just its location, or [location]:[component]:[architecture])")
             d1 = d[1].split(":")
             c = d1[0]
@@ -117,14 +117,19 @@ def main():
     serve_parser.add_argument(
         "-s", "--stop", action="store_true", help="stop serving repo")
 
-    add_debs_parser = subparsers.add_parser(
-        "add_debs", help="add DEBs to the repo")
-    add_debs_parser.add_argument("deb_files", nargs="+", type=_deb_file_transform,
-                                 help="DEB files to add (either just their locations, or [location]:[component]:[architecture])")
+    add_packages_parser = subparsers.add_parser(
+        "add_packages", help="add DEBs to the repo")
+    add_packages_parser.add_argument("deb_files", nargs="+", type=_deb_file_transform,
+                                     help="DEB files to add (either just their locations, or [location]:[component]:[architecture])")
 
-    list_debs_parser = subparsers.add_parser(
-        "list_debs", help="list DEBs in the repo")
-    list_debs_parser.add_argument(
+    remove_packages_parser = subparsers.add_parser(
+        "remove_packages", help="removes packages from the repo")
+    remove_packages_parser.add_argument(
+        "packages", nargs="+", help="packages to remove")
+
+    list_packages_parser = subparsers.add_parser(
+        "list_packages", help="list DEBs in the repo")
+    list_packages_parser.add_argument(
         "--pretty", action="store_true", help="pretty-print")
 
     args = parser.parse_args()
@@ -295,12 +300,12 @@ SignWith: {}
         else:
             raise ValueError("Cannot serve this repo locally")
 
-    elif args.command == "add_debs":
+    elif args.command == "add_packages":
         if not os.path.isdir(os.path.join(REPO_FILES_LOCATION, "db")):
             # First time run edge case
             original_debs_list = []
         else:
-            original_debs_list = list_debs_available(
+            original_debs_list = list_packages_available(
                 CODENAME, REPO_FILES_LOCATION)
         for deb_file, component, arch in args.deb_files:
             if os.stat(deb_file).st_size > 10000000 and not SETTINGS["local"]:
@@ -315,7 +320,7 @@ SignWith: {}
                     arch = "all"
             except subprocess.CalledProcessError as e:
                 LOGGER.exception("reprepro error")
-        all_debs_list = list_debs_available(CODENAME, REPO_FILES_LOCATION)
+        all_debs_list = list_packages_available(CODENAME, REPO_FILES_LOCATION)
         new_debs_list = [
             deb for deb in all_debs_list if deb not in original_debs_list]
         if new_debs_list:
@@ -333,12 +338,31 @@ SignWith: {}
         else:
             LOGGER.warning("No new DEBs added")
 
-    elif args.command == "remove_debs":
-        # Need to add removal
-        raise NotImplementedError()
+    elif args.command == "remove_packages":
+        original_debs_list = list_packages_available(CODENAME, REPO_FILES_LOCATION)
+        for package in args.packages:
+            subprocess.check_call(
+                ["reprepro", "-Vb", REPO_FILES_LOCATION, "remove", CODENAME, package])
+        all_debs_list = list_packages_available(CODENAME, REPO_FILES_LOCATION)
+        removed_debs_list = [
+            deb for deb in original_debs_list if deb not in all_debs_list]
+        if removed_debs_list:
+            LOGGER.info("DEBs removed")
+            LOGGER.info("\n" + tabulate(removed_debs_list, headers="keys"))
+            if not SETTINGS["local"]:
+                # Push to GitHub
+                os.chdir(REPO_FILES_LOCATION)
+                subprocess.check_call(["git", "checkout", "gh-pages"])
+                subprocess.check_call(["git", "add", "--all"])
+                subprocess.check_call(
+                    ["git", "commit", "-m", "update repo", "-a"])
+                subprocess.check_call(
+                    ["git", "push", "origin", "gh-pages"])
+        else:
+            LOGGER.warning("No DEBs removed")
 
-    elif args.command == "list_debs":
-        debs = list_debs_available(CODENAME, REPO_FILES_LOCATION)
+    elif args.command == "list_packages":
+        debs = list_packages_available(CODENAME, REPO_FILES_LOCATION)
         if debs:
             if args.pretty:
                 LOGGER.info("\n" + tabulate(debs, headers="keys"))

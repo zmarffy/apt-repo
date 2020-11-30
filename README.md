@@ -45,7 +45,7 @@
 2. Add some DEB files to the repo.
 
     ```text
-    apt-repo [-h] [-n NAME] [-l BASE_LOCATION] add_debs [-h] [-d] deb_files [deb_files ...]
+    apt-repo [-h] [-n NAME] [-l BASE_LOCATION] add_packages [-h] [-d] deb_files [deb_files ...]
     ```
 
     **Note:** You can specify DEB files with just their filenames, or like "`[location]:[component]:[architecture]`"; for example: "`mydeb_1.0.0-1_all.deb:main:all`". You can specify just one of the variables so long as you have both colons. Architecture will be determined automatically if you do not specify it (by reading packages' actual architecture fields; not by assuming from their names).
@@ -60,10 +60,16 @@
 
 ## Other stuff you can do
 
-- List the files in the repo
+- List the packages in the repo
 
     ```text
     apt-repo [-h] [-n NAME] [-l BASE_LOCATION] list [-h] [--pretty]
+    ```
+
+- Remove packages in the repo
+
+    ```text
+    apt-repo [-h] [-n NAME] [-l BASE_LOCATION] remove_packages [-h] packages [packages ...]
     ```
 
 ## Tips
@@ -87,6 +93,5 @@ That's the whole point of GitHub pages, after all, that "nicer form".
 ## Missing features
 
 - HTTPS and auth for local repos
-- Removing DEBs
 - Renewing one's GPG key/switching which key the repo is signed with
 
