@@ -82,11 +82,11 @@ This is largely a question about APT, not something for this project specificall
 
 If your GitHub repo is private, tell those who need access to it to generate a personal access token with repo read abilities (you can do so [in the web interface](https://github.com/settings/tokens/new), or even use [a Selenium script](https://gist.github.com/zmarffy/11eee870c73d6a25d49bacc06b24a8ab)). Then they should add the following to their `/etc/apt/sources.list`.
 
-`deb https://[username]:[personal_access_token]@raw.githubusercontent.com/[repo_host_username]/[repo_name]/gh-pages [component]`
+`deb https://[username]:[personal_access_token]@raw.githubusercontent.com/[repo_host_username]/[repo_name]/gh-pages [codename] [component]`
 
 If your GitHub repo is public, the same method can be followed (`[username]:[password]` is not necessary though), or you can use this much nicer form.
 
-`deb https://[repo_host_username].github.io/[repo_name]/ focal main`
+`deb https://[repo_host_username].github.io/[repo_name]/ [codename] [component]`
 
 That's the whole point of GitHub pages, after all, that "nicer form".
 
