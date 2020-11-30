@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import logging
 import os
 import re
 import shutil
@@ -35,6 +36,8 @@ REQUIREMENTS = [
     Requirement("GitHub CLI", ["gh", "--version"])
 ]
 
+LOGGER = logging.getLogger()
+
 
 def list_debs_available(codename, repo_files_location):
     # Literal magic
@@ -55,6 +58,8 @@ def determine_arch(deb_file):
 
 
 def main():
+
+    zmtools.init_logging()
 
     def _deb_file_transform(s):
         # More magic
@@ -142,8 +147,8 @@ def main():
             raise ValueError(
                 f"Invalid value \"{config['host']}\" for key \"host\"")
         if config["host"] == "github-private" and args.splash is not None:
-            print(
-                "WARNING: Ignoring --splash argument as splash pages are not supported for GitHub private repos")
+            LOGGER.warning(
+                "Ignoring --splash argument as splash pages are not supported for GitHub private repos")
             args.splash = None
         try:
             # Ignore -n
@@ -256,7 +261,8 @@ SignWith: {}
                 repo_type = "private"
             else:
                 repo_type = "public"
-            print("WARNING: You are using GitHub to host your repo; your files must not exceed 100 MB and the entire repo must not exceed 100 GB")
+            LOGGER.warning(
+                "You are using GitHub to host your repo; your files must not exceed 100 MB and the entire repo must not exceed 100 GB")
             os.chdir(BASE_LOCATION)
             subprocess.check_call(
                 ["gh", "repo", "create", NAME, f"--{repo_type}", "-y"])
@@ -298,8 +304,8 @@ SignWith: {}
                 CODENAME, REPO_FILES_LOCATION)
         for deb_file, component, arch in args.deb_files:
             if os.stat(deb_file).st_size > 10000000 and not SETTINGS["local"]:
-                print(
-                    f"WARNING: {deb_file} exceeds 100 MB; cannot add to repo")
+                LOGGER.warning(
+                    f"{deb_file} exceeds 100 MB; cannot add to repo")
             if arch == "all":
                 arch = ALL_ARCH
             try:
@@ -308,14 +314,13 @@ SignWith: {}
                 if arch == ALL_ARCH:
                     arch = "all"
             except subprocess.CalledProcessError as e:
-                print(e)
+                LOGGER.exception("reprepro error")
         all_debs_list = list_debs_available(CODENAME, REPO_FILES_LOCATION)
         new_debs_list = [
             deb for deb in all_debs_list if deb not in original_debs_list]
         if new_debs_list:
-            print()
-            print("New DEBs added")
-            print(tabulate(new_debs_list, headers="keys"))
+            LOGGER.info("New DEBs added")
+            LOGGER.info("\n" + tabulate(new_debs_list, headers="keys"))
             if not SETTINGS["local"]:
                 # Push to GitHub
                 os.chdir(REPO_FILES_LOCATION)
@@ -326,7 +331,7 @@ SignWith: {}
                 subprocess.check_call(
                     ["git", "push", "origin", "gh-pages"])
         else:
-            print("No new DEBs added")
+            LOGGER.warning("No new DEBs added")
 
     elif args.command == "remove_debs":
         # Need to add removal
@@ -336,12 +341,12 @@ SignWith: {}
         debs = list_debs_available(CODENAME, REPO_FILES_LOCATION)
         if debs:
             if args.pretty:
-                print(tabulate(debs, headers="keys"))
+                LOGGER.info("\n" + tabulate(debs, headers="keys"))
             else:
                 for deb in debs:
-                    print(" ".join([v for v in deb.values()]).strip())
+                    LOGGER.info(" ".join([v for v in deb.values()]).strip())
         else:
-            print(f"No DEBs in repo \"{NAME}\" yet")
+            LOGGER.info(f"No DEBs in repo \"{NAME}\" yet")
 
     else:
         parser.print_help()
