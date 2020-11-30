@@ -38,7 +38,7 @@
     }
     ```
 
-    Using "`github-public`" or "`github-private`" as "`host`" will create a repo on GitHub to host your APT repo in. Yes, this is weird. Yes, it works.
+    Using "`github`" or "`github-private`" as "`host`" will create a repo on GitHub to host your APT repo in. Yes, this is weird. Yes, it works.
 
     **Note:** Do not specify "`all`" as an architecture here, even if you have packages that fit all architectures.
 
@@ -70,11 +70,23 @@
 
 - Why not host your repo on an Amazon S3 bucket? Mount it to your computer using [`s3fs`](http://manpages.ubuntu.com/manpages/xenial/man1/s3fs.1.html). You can even [enable auth](https://stackoverflow.com/questions/3091084/does-amazon-s3-support-http-request-with-basic-authentication) if you do that
 
-- Why not completely avoid spending money and use the "host-on-GitHub" feature
+## How can users add created repos to their APT sources if I use GitHub as the host
+
+This is largely a question about APT, not something for this project specifically, but I'll lend a hand.
+
+If your GitHub repo is private, tell those who need access to it to generate a personal access token with repo read abilities (you can do so [in the web interface](https://github.com/settings/tokens/new), or even use [a Selenium script](https://gist.github.com/zmarffy/11eee870c73d6a25d49bacc06b24a8ab)). Then they should add the following to their `/etc/apt/sources.list`.
+
+`deb https://[username]:[personal_access_token]@raw.githubusercontent.com/[repo_host_username]/[repo_name]/gh-pages [component]`
+
+If your GitHub repo is public, the same method can be followed (`[username]:[password]` is not necessary though), or you can use this much nicer form.
+
+`deb https://[repo_host_username].github.io/[repo_name]/ focal main`
+
+That's the whole point of GitHub pages, after all, that "nicer form".
 
 ## Missing features
 
 - HTTPS and auth for local repos
 - Removing DEBs
 - Renewing one's GPG key/switching which key the repo is signed with
-- Correct splash page support when hosted on GitHub
+

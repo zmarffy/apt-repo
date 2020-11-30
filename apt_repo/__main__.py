@@ -24,7 +24,7 @@ LIST_OUTPUT_KEYS = (
 )
 VALID_HOSTS = (
     "local",
-    "github-public",
+    "github",
     "github-private"
 )
 
@@ -141,6 +141,10 @@ def main():
         if config["host"] not in VALID_HOSTS:
             raise ValueError(
                 f"Invalid value \"{config['host']}\" for key \"host\"")
+        if config["host"] == "github-private" and args.splash is not None:
+            print(
+                "WARNING: Ignoring --splash argument as splash pages are not supported for GitHub private repos")
+            args.splash = None
         try:
             # Ignore -n
             NAME = config["name"]
@@ -248,16 +252,20 @@ SignWith: {}
             f.write(distributions_string.format(config["origin"], config["label"], config["codename"], " ".join(
                 config["arch"]), " ".join(config["components"]), config["description"], key))
         if config["host"] != "local":
-            repo_type = config["host"].split("-")[1]
+            if "private" in config["host"]:
+                repo_type = "private"
+            else:
+                repo_type = "public"
             print("WARNING: You are using GitHub to host your repo; your files must not exceed 100 MB and the entire repo must not exceed 100 GB")
             os.chdir(BASE_LOCATION)
             subprocess.check_call(
                 ["gh", "repo", "create", NAME, f"--{repo_type}", "-y"])
             os.chdir(REPO_FILES_LOCATION)
+            subprocess.check_call(["git", "checkout", "-b", "gh-pages"])
             subprocess.check_call(["git", "add", "--all"])
             subprocess.check_call(
                 ["git", "commit", "-m", "set up repo", "-a"])
-            subprocess.check_call(["git", "push", "origin", "master"])
+            subprocess.check_call(["git", "push", "origin", "gh-pages"])
 
     elif args.command == "serve":
         if SETTINGS["local"]:
@@ -290,7 +298,8 @@ SignWith: {}
                 CODENAME, REPO_FILES_LOCATION)
         for deb_file, component, arch in args.deb_files:
             if os.stat(deb_file).st_size > 10000000 and not SETTINGS["local"]:
-                print(f"WARNING: {deb_file} exceeds 100 MB; cannot add to repo")
+                print(
+                    f"WARNING: {deb_file} exceeds 100 MB; cannot add to repo")
             if arch == "all":
                 arch = ALL_ARCH
             try:
@@ -310,10 +319,12 @@ SignWith: {}
             if not SETTINGS["local"]:
                 # Push to GitHub
                 os.chdir(REPO_FILES_LOCATION)
+                subprocess.check_call(["git", "checkout", "gh-pages"])
                 subprocess.check_call(["git", "add", "--all"])
                 subprocess.check_call(
                     ["git", "commit", "-m", "update repo", "-a"])
-                subprocess.check_call(["git", "push", "origin", "master"])
+                subprocess.check_call(
+                    ["git", "push", "origin", "gh-pages"])
         else:
             print("No new DEBs added")
 
