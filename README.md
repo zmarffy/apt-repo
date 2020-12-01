@@ -48,7 +48,7 @@
     apt-repo [-h] [-n NAME] [-l BASE_LOCATION] add_packages [-h] [-d] deb_files [deb_files ...]
     ```
 
-    **Note:** You can specify DEB files with just their filenames, or like "`[location]:[component]:[architecture]`"; for example: "`mydeb_1.0.0-1_all.deb:main:all`". You can specify just one of the variables so long as you have both colons. Architecture will be determined automatically if you do not specify it (by reading packages' actual architecture fields; not by assuming from their names).
+    **Note:** You can specify DEB files with just their filenames, or like "`[location]:[component]`"; for example: "`mydeb_1.0.0-1_all.deb:main`". Architecture will be determined automatically (by reading packages' actual architecture fields; not by assuming from their names).
 
 3. Serve the repo.
 
@@ -94,4 +94,3 @@ That's the whole point of GitHub pages, after all, that "nicer form".
 
 - HTTPS and auth for local repos
 - Renewing one's GPG key/switching which key the repo is signed with
-

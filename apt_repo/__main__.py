@@ -29,13 +29,6 @@ VALID_HOSTS = (
     "github-private"
 )
 
-REQUIREMENTS = [
-    Requirement("docker", ["docker", "-v"]),
-    Requirement("reprepro", ["reprepro", "--version"]),
-    Requirement("gpg", ["gpg", "--version"]),
-    Requirement("GitHub CLI", ["gh", "--version"])
-]
-
 LOGGER = logging.getLogger()
 
 
@@ -63,35 +56,18 @@ def main():
 
     def _deb_file_transform(s):
         # More magic
-        d = s.split(".deb:")
-        if len(d) != 1:
-            if ":" not in d[1]:
-                add_packages_parser.print_help()
-                add_packages_parser.error(
-                    f"Incorrect format for input \"{s}\" (use just its location, or [location]:[component]:[architecture])")
-            d1 = d[1].split(":")
-            c = d1[0]
-            if c == "":
-                c = None
-            a = d1[1]
-            if a == "":
-                a = None
+        d = s.split(".deb:", 1)
+        if len(d) == 2:
             f = d[0] + ".deb"
+            c = d[1]
         else:
-            c = None
-            a = None
             f = s
-        if a is None:
-            a = determine_arch(f)
+            c = None
+        a = determine_arch(f)
         if c is None:
             c = input(f"{f} component: ")
-            if c == "":
+            if not c:
                 raise ValueError("Empty component")
-        if a is None:
-            # Impossible?
-            a = input(f"{f} architecture: ")
-            if a == "":
-                raise ValueError("Empty architecture")
         return f, c, a
 
     parser = argparse.ArgumentParser()
@@ -120,7 +96,7 @@ def main():
     add_packages_parser = subparsers.add_parser(
         "add_packages", help="add DEBs to the repo")
     add_packages_parser.add_argument("deb_files", nargs="+", type=_deb_file_transform,
-                                     help="DEB files to add (either just their locations, or [location]:[component]:[architecture])")
+                                     help="DEB files to add (either just their locations, or [location]:[component])")
 
     remove_packages_parser = subparsers.add_parser(
         "remove_packages", help="removes packages from the repo")
@@ -339,7 +315,8 @@ SignWith: {}
             LOGGER.warning("No new DEBs added")
 
     elif args.command == "remove_packages":
-        original_debs_list = list_packages_available(CODENAME, REPO_FILES_LOCATION)
+        original_debs_list = list_packages_available(
+            CODENAME, REPO_FILES_LOCATION)
         for package in args.packages:
             subprocess.check_call(
                 ["reprepro", "-Vb", REPO_FILES_LOCATION, "remove", CODENAME, package])
@@ -379,6 +356,4 @@ SignWith: {}
 
 
 if __name__ == "__main__":
-    for requirement in REQUIREMENTS:
-        requirement.check()
     sys.exit(main())
