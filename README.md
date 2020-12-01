@@ -10,6 +10,7 @@
 - `python3`
 - `python-magic` (a `pip` package)
 - `pyyaml` (a `pip` package)
+- `reequirements` (a `pip` package)
 - `zmtools` (a `pip` package)
 
 ## Setup
