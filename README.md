@@ -72,6 +72,12 @@
     apt-repo [-h] [-n NAME] [-l BASE_LOCATION] remove_packages [-h] packages [packages ...]
     ```
 
+- Getting low on space on a GitHub-hosted repo? Run the clean function
+
+    ```text
+        apt-repo [-h] [-n NAME] [-l BASE_LOCATION] clean -h
+    ```
+
 ## Tips
 
 - Why not host your repo on an Amazon S3 bucket? Mount it to your computer using [`s3fs`](http://manpages.ubuntu.com/manpages/xenial/man1/s3fs.1.html). You can even [enable auth](https://stackoverflow.com/questions/3091084/does-amazon-s3-support-http-request-with-basic-authentication) if you do that

@@ -108,6 +108,9 @@ def main():
     list_packages_parser.add_argument(
         "--pretty", action="store_true", help="pretty-print")
 
+    subparsers.add_parser(
+        "clean", help="clean GitHub-hosted APT repo (may take a while)")
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -181,7 +184,7 @@ def main():
                 shutil.rmtree(DOTAPTREPO_LOCATION)
             else:
                 sys.exit("Setup aborted")
-        # Make necessary directories if necessary
+        # Make directories if necessary
         os.makedirs(REPO_FILES_LOCATION, exist_ok=True)
         os.makedirs(DOTAPTREPO_LOCATION, exist_ok=True)
         SETTINGS = {
@@ -244,15 +247,15 @@ SignWith: {}
                 repo_type = "public"
             LOGGER.warning(
                 "You are using GitHub to host your repo; your files must not exceed 100 MB and the entire repo must not exceed 100 GB")
-            os.chdir(BASE_LOCATION)
-            subprocess.check_call(
-                ["gh", "repo", "create", NAME, f"--{repo_type}", "-y"])
-            os.chdir(REPO_FILES_LOCATION)
-            subprocess.check_call(["git", "checkout", "-b", "gh-pages"])
-            subprocess.check_call(["git", "add", "--all"])
-            subprocess.check_call(
-                ["git", "commit", "-m", "set up repo", "-a"])
-            subprocess.check_call(["git", "push", "origin", "gh-pages"])
+            with zmtools.working_directory(BASE_LOCATION):
+                subprocess.check_call(
+                    ["gh", "repo", "create", NAME, f"--{repo_type}", "-y"])
+            with zmtools.working_directory(REPO_FILES_LOCATION):
+                subprocess.check_call(["git", "checkout", "-b", "gh-pages"])
+                subprocess.check_call(["git", "add", "--all"])
+                subprocess.check_call(
+                    ["git", "commit", "-m", "set up repo", "-a"])
+                subprocess.check_call(["git", "push", "origin", "gh-pages"])
 
     elif args.command == "serve":
         if SETTINGS["local"]:
@@ -304,13 +307,13 @@ SignWith: {}
             LOGGER.info("\n" + tabulate(new_debs_list, headers="keys"))
             if not SETTINGS["local"]:
                 # Push to GitHub
-                os.chdir(REPO_FILES_LOCATION)
-                subprocess.check_call(["git", "checkout", "gh-pages"])
-                subprocess.check_call(["git", "add", "--all"])
-                subprocess.check_call(
-                    ["git", "commit", "-m", "update repo", "-a"])
-                subprocess.check_call(
-                    ["git", "push", "origin", "gh-pages"])
+                with zmtools.working_directory(REPO_FILES_LOCATION):
+                    subprocess.check_call(["git", "checkout", "gh-pages"])
+                    subprocess.check_call(["git", "add", "--all"])
+                    subprocess.check_call(
+                        ["git", "commit", "-m", "update repo", "-a"])
+                    subprocess.check_call(
+                        ["git", "push", "origin", "gh-pages"])
         else:
             LOGGER.warning("No new DEBs added")
 
@@ -328,13 +331,13 @@ SignWith: {}
             LOGGER.info("\n" + tabulate(removed_debs_list, headers="keys"))
             if not SETTINGS["local"]:
                 # Push to GitHub
-                os.chdir(REPO_FILES_LOCATION)
-                subprocess.check_call(["git", "checkout", "gh-pages"])
-                subprocess.check_call(["git", "add", "--all"])
-                subprocess.check_call(
-                    ["git", "commit", "-m", "update repo", "-a"])
-                subprocess.check_call(
-                    ["git", "push", "origin", "gh-pages"])
+                with zmtools.working_directory(REPO_FILES_LOCATION):
+                    subprocess.check_call(["git", "checkout", "gh-pages"])
+                    subprocess.check_call(["git", "add", "--all"])
+                    subprocess.check_call(
+                        ["git", "commit", "-m", "update repo", "-a"])
+                    subprocess.check_call(
+                        ["git", "push", "origin", "gh-pages"])
         else:
             LOGGER.warning("No DEBs removed")
 
@@ -348,7 +351,24 @@ SignWith: {}
                     LOGGER.info(" ".join([v for v in deb.values()]).strip())
         else:
             LOGGER.info(f"No DEBs in repo \"{NAME}\" yet")
-
+    elif args.command == "clean":
+        if SETTINGS["local"]:
+            raise ValueError("Can only clean a repo hosted on GitHub")
+        else:
+            # Completely reset the entire repo
+            with zmtools.working_directory(REPO_FILES_LOCATION):
+                remote = subprocess.check_output(
+                    ["git", "config", "--get", "remote.origin.url"]).decode().strip()
+                shutil.rmtree(".git")
+                subprocess.check_call(["git", "init"])
+                subprocess.check_call(["git", "checkout", "-b", "gh-pages"])
+                subprocess.check_call(
+                    ["git", "remote", "add", "origin", remote])
+                subprocess.check_call(["git", "add", "--all"])
+                subprocess.check_call(
+                    ["git", "commit", "-m", "clean repo", "-a"])
+                subprocess.check_call(
+                    ["git", "push", "origin", "gh-pages", "--force"])
     else:
         parser.print_help()
         parser.error("Invalid command")

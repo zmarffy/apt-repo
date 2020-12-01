@@ -14,7 +14,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     url='https://github.com/zmarffy/apt-repo',
     license='MIT',
-    description='Host APT repos',
+    description='Host APT reposon your server or GitHub',
     python_requires='>=3.6',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -22,7 +22,7 @@ setuptools.setup(
         "reequirements",
         'python-magic',
         'pyyaml',
-        'zmtools>=1.5.0'
+        'zmtools>=1.6.0'
     ],
     entry_points={
         'console_scripts': [
