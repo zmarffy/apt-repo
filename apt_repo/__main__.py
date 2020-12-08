@@ -16,6 +16,8 @@ import zmtools
 from reequirements import Requirement
 from tabulate import tabulate
 
+# TODO: Replace docker shell commands with docker Python API; seperate some stuff out into seperate files
+
 LIST_OUTPUT_KEYS = (
     "codename",
     "component",
@@ -33,7 +35,15 @@ LOGGER = logging.getLogger()
 
 
 def list_packages_available(codename, repo_files_location):
-    # Literal magic
+    """Return a dict of info about the packages available in the repo
+
+    Args:
+        codename (string): List packages of this codename
+        repo_files_location (string): Location of the repo files
+
+    Returns:
+        list[dict]: Info about the packages available
+    """
     o = subprocess.check_output(
         ["reprepro", "-b", repo_files_location, "list", codename]).decode().strip()
     if o == "":
@@ -45,9 +55,15 @@ def list_packages_available(codename, repo_files_location):
 
 
 def determine_arch(deb_file):
-    # Not magic
-    out = subprocess.check_output(["dpkg", "--info", deb_file]).decode()
-    return re.findall("(?<=Architecture: ).+", out)[0]
+    """Determine the architecture of a DEB file
+
+    Args:
+        deb_file (string): Location of DEB file
+
+    Returns:
+        string: The architecture
+    """
+    return re.findall("(?<=Architecture: ).+", subprocess.check_output(["dpkg", "--info", deb_file]).decode())[0]
 
 
 def main():
@@ -55,7 +71,6 @@ def main():
     zmtools.init_logging()
 
     def _deb_file_transform(s):
-        # More magic
         d = s.split(".deb:", 1)
         if len(d) == 2:
             f = d[0] + ".deb"
@@ -188,7 +203,8 @@ def main():
         os.makedirs(REPO_FILES_LOCATION, exist_ok=True)
         os.makedirs(DOTAPTREPO_LOCATION, exist_ok=True)
         SETTINGS = {
-            "local": config["host"] == "local"
+            "local": config["host"] == "local",
+            "password": config.get("repo_password", "")
         }
         with open(REPO_SETTINGS_LOCATION, "w") as f:
             f.write(yaml.dump(SETTINGS))
@@ -262,8 +278,12 @@ SignWith: {}
             if not args.stop:
                 if os.path.isfile(os.path.join(DOTAPTREPO_LOCATION, "containerid")):
                     raise ValueError("Repo currently being served")
-                container_id = subprocess.check_output(
-                    ["docker", "run", "--rm", "-d", "--name", f"apt-repo_{NAME}", "-p", f"{args.port}:80", "-v", f"{REPO_FILES_LOCATION}:{os.path.join(os.sep, 'usr', 'local', 'apache2', 'htdocs')}", "httpd"]).decode().strip()
+                cmd = ["docker", "run", "--rm", "-d", "--name", f"apt-repo_{NAME}", "-p", f"{args.port}:80", "-v",
+                       f"{REPO_FILES_LOCATION}:{os.path.join(os.sep, 'usr', 'local', 'apache2', 'htdocs')}"]
+                if SETTINGS["password"] != "":
+                    cmd.extend(["-e", f"REPO_PASSWORD={SETTINGS['password']}"])
+                cmd.append("apt-repo")
+                container_id = subprocess.check_output(cmd).decode().strip()
                 with open(os.path.join(DOTAPTREPO_LOCATION, "containerid"), "w") as f:
                     f.write(container_id)
             else:
