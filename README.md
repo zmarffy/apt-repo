@@ -40,6 +40,8 @@
     }
     ```
 
+    You can set a repo password with the key `repo_password`. This will enable baic authentication for the repo. The username is "repo".
+
     Using "`github`" or "`github-private`" as "`host`" will create a repo on GitHub to host your APT repo in. Yes, this is weird. Yes, it works.
 
     **Note:** Do not specify "`all`" as an architecture here, even if you have packages that fit all architectures.
