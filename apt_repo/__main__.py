@@ -129,7 +129,6 @@ def main():
     args = parser.parse_args()
 
     if args.command is None:
-        parser.print_help()
         parser.error("Need to specify a command")
 
     NAME = args.name

@@ -76,7 +76,7 @@
 - Getting low on space on a GitHub-hosted repo? Run the clean function
 
     ```text
-        apt-repo [-h] [-n NAME] [-l BASE_LOCATION] clean -h
+        apt-repo [-h] [-n NAME] [-l BASE_LOCATION] clean [-h]
     ```
 
 ## Tips
