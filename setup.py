@@ -42,7 +42,7 @@ setuptools.setup(
         'python-magic',
         'pyyaml',
         'zmtools>=1.6.0',
-        'zetuptools>=1.0.1'
+        'zetuptools>=1.0.2'
     ],
     entry_points={
         'console_scripts': [

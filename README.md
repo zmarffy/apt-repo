@@ -12,6 +12,7 @@
 - `pyyaml` (a `pip` package)
 - `reequirements` (a `pip` package)
 - `zmtools` (a `pip` package)
+- `zetuptools` (a `pip` package)
 
 ## Setup
 
