@@ -54,5 +54,6 @@ setuptools.setup(
     cmdclass={
         'install': CustomInstall,
         'develop': CustomDevelop
-    }
+    },
+    include_package_data=True
 )
