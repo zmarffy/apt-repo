@@ -67,7 +67,7 @@
 - List the packages in the repo
 
     ```text
-    apt-repo [-h] [-n NAME] [-l BASE_LOCATION] list [-h] [--pretty]
+    apt-repo [-h] [-n NAME] [-l BASE_LOCATION] list [-h] [--no_format]
     ```
 
 - Remove packages in the repo

@@ -10,13 +10,14 @@ import subprocess
 import sys
 import uuid
 
+import docker
 import magic
 import yaml
 import zmtools
 from reequirements import Requirement
 from tabulate import tabulate
 
-# TODO: Replace docker shell commands with docker Python API; seperate some stuff out into seperate files
+# TODO: Seperate some stuff out into seperate files
 
 LIST_OUTPUT_KEYS = (
     "codename",
@@ -121,10 +122,10 @@ def main():
     list_packages_parser = subparsers.add_parser(
         "list_packages", help="list DEBs in the repo")
     list_packages_parser.add_argument(
-        "--pretty", action="store_true", help="pretty-print")
+        "--no_format", action="store_true", help="do not pretty-print list")
 
     subparsers.add_parser(
-        "clean", help="clean GitHub-hosted APT repo (may take a while)")
+        "clean", help="clean GitHub-hosted repo (may take a while)")
 
     args = parser.parse_args()
 
@@ -277,14 +278,15 @@ SignWith: {}
             if not args.stop:
                 if os.path.isfile(os.path.join(DOTAPTREPO_LOCATION, "containerid")):
                     raise ValueError("Repo currently being served")
-                cmd = ["docker", "run", "--rm", "-d", "--name", f"apt-repo_{NAME}", "-p", f"{args.port}:80", "-v",
-                       f"{REPO_FILES_LOCATION}:{os.path.join(os.sep, 'usr', 'local', 'apache2', 'htdocs')}"]
                 if SETTINGS["password"] != "":
-                    cmd.extend(["-e", f"REPO_PASSWORD={SETTINGS['password']}"])
-                cmd.append("apt-repo")
-                container_id = subprocess.check_output(cmd).decode().strip()
+                    environment = {"REPO_PASSWORD": SETTINGS["password"]}
+                else:
+                    environment = None
+                client = docker.from_env()
+                container = client.containers.run("apt-repo", name=f"apt-repo_{NAME}", auto_remove=True, detach=True, ports={'80/tcp': args.port}, volumes={
+                                                  REPO_FILES_LOCATION: {"bind": os.path.join(os.sep, 'usr', 'local', 'apache2', 'htdocs'), "mode": 'ro'}}, environment=environment)
                 with open(os.path.join(DOTAPTREPO_LOCATION, "containerid"), "w") as f:
-                    f.write(container_id)
+                    f.write(container.id)
             else:
                 try:
                     with open(os.path.join(DOTAPTREPO_LOCATION, "containerid"), "r") as f:
@@ -292,8 +294,8 @@ SignWith: {}
                 except FileNotFoundError:
                     raise ValueError(
                         "Repo not currently being served") from None
-                subprocess.check_output(
-                    ["docker", "container", "stop", container_id])
+                client = docker.from_env()
+                client.containers.get(container_id).stop()
                 os.remove(os.path.join(DOTAPTREPO_LOCATION, "containerid"))
         else:
             raise ValueError("Cannot serve this repo locally")
@@ -363,7 +365,7 @@ SignWith: {}
     elif args.command == "list_packages":
         debs = list_packages_available(CODENAME, REPO_FILES_LOCATION)
         if debs:
-            if args.pretty:
+            if not args.no_format:
                 LOGGER.info("\n" + tabulate(debs, headers="keys"))
             else:
                 for deb in debs:
