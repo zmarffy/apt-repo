@@ -41,6 +41,7 @@ setuptools.setup(
         'reequirements',
         'python-magic',
         'pyyaml',
+        'tabulate',
         'zmtools>=1.6.0',
         'zetuptools>=1.0.2'
     ],
