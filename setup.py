@@ -6,7 +6,7 @@ import setuptools
 import zetuptools
 from pkg_resources import resource_filename
 
-TOOLS = zetuptools.SetuptoolsExtensions("Zeke Marffy", "zmarffy@yahoo.com")
+TOOLS = zetuptools.SetuptoolsExtensions("apt-repo", "Zeke Marffy", "zmarffy@yahoo.com")
 
 
 setuptools.setup(
@@ -27,7 +27,7 @@ setuptools.setup(
         'pyyaml',
         'tabulate',
         'zmtools>=1.6.0',
-        'zetuptools>=2.0.0'
+        'zetuptools>=2.0.1'
     ],
     entry_points={
         'console_scripts': [
