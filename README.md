@@ -87,7 +87,7 @@
 
 ## Tips
 
-- Why not host your repo on an Amazon S3 bucket? Mount it to your computer using [`s3fs`](http://manpages.ubuntu.com/manpages/xenial/man1/s3fs.1.html). You can even [enable auth](https://stackoverflow.com/questions/3091084/does-amazon-s3-support-http-request-with-basic-authentication) if you do that
+- Why not host your repo on an Amazon S3 bucket? Mount it to your computer using [`s3fs`](http://manpages.ubuntu.com/manpages/xenial/man1/s3fs.1.html)
 
 ## How can users add created repos to their APT sources if I use GitHub as the host
 
@@ -95,15 +95,18 @@ This is largely a question about APT, not something for this project specificall
 
 If your GitHub repo is private, tell those who need access to it to generate a personal access token with repo read abilities (you can do so [in the web interface](https://github.com/settings/tokens/new), or even use [a Selenium script](https://gist.github.com/zmarffy/11eee870c73d6a25d49bacc06b24a8ab)). Then they should add the following to their `/etc/apt/sources.list`.
 
-`deb https://[username]:[personal_access_token]@raw.githubusercontent.com/[repo_host_username]/[repo_name]/gh-pages [codename] [component]`
+```text
+deb https://[username]:[personal_access_token]@raw.githubusercontent.com/[repo_host_username]/[repo_name]/gh-pages [codename] [component]
+```
 
 If your GitHub repo is public, the same method can be followed (`[username]:[password]` is not necessary though), or you can use this much nicer form.
 
-`deb https://[repo_host_username].github.io/[repo_name]/ [codename] [component]`
+```text
+deb https://[repo_host_username].github.io/[repo_name]/ [codename] [component]
+```
 
 That's the whole point of GitHub pages, after all, that "nicer form".
 
 ## Missing features
 
 - HTTPS for local repos
-- Renewing one's GPG key/switching which key the repo is signed with
