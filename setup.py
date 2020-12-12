@@ -6,7 +6,7 @@ import setuptools
 import zetuptools
 from pkg_resources import resource_filename
 
-TOOLS = zetuptools.SetuptoolsExtensions("apt-repo", "Zeke Marffy", "zmarffy@yahoo.com")
+TOOLS = zetuptools.SetuptoolsExtensions("apt-repo-maker", "Zeke Marffy", "zmarffy@yahoo.com")
 
 
 setuptools.setup(
