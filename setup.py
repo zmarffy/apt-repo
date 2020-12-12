@@ -1,33 +1,17 @@
 import os
-import re
 from os.path import join as join_path
 
 import docker
 import setuptools
 import zetuptools
 from pkg_resources import resource_filename
-from setuptools.command.develop import develop
-from setuptools.command.install import install
 
-TOOLS = zetuptools.ZetupTools("apt-repo", "Zeke Marffy", "zmarffy@yahoo.com")
-PACKAGE = TOOLS.packages["apt_repo"]
-
-
-class CustomInstall(install):
-    def run(self):
-        install.run(self)
-        PACKAGE.build_docker_images()
-
-
-class CustomDevelop(develop):
-    def run(self):
-        develop.run(self)
-        PACKAGE.build_docker_images()
+TOOLS = zetuptools.SetuptoolsExtensions("Zeke Marffy", "zmarffy@yahoo.com")
 
 
 setuptools.setup(
     name=TOOLS.name,
-    version=PACKAGE.version,
+    version=TOOLS.version,
     author=TOOLS.author,
     author_email=TOOLS.author_email,
     packages=setuptools.find_packages(),
@@ -43,7 +27,7 @@ setuptools.setup(
         'pyyaml',
         'tabulate',
         'zmtools>=1.6.0',
-        'zetuptools>=1.0.2'
+        'zetuptools>=2.0.0'
     ],
     entry_points={
         'console_scripts': [
@@ -51,9 +35,5 @@ setuptools.setup(
         ],
     },
     package_data=TOOLS.all_files,
-    cmdclass={
-        'install': CustomInstall,
-        'develop': CustomDevelop
-    },
     include_package_data=True
 )

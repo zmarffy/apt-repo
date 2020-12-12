@@ -11,10 +11,13 @@
 - `python-magic` (a `pip` package)
 - `pyyaml` (a `pip` package)
 - `reequirements` (a `pip` package)
+- `tabulate` (a `pip` package)
 - `zmtools` (a `pip` package)
 - `zetuptools` (a `pip` package)
 
 ## Setup
+
+0. Install the `pip` package and then run `install-directives apt-repo install`. Note that you must have permissions to use `docker`.
 
 1. Run `apt-repo setup`. Usage is as follows.
 
@@ -102,5 +105,5 @@ That's the whole point of GitHub pages, after all, that "nicer form".
 
 ## Missing features
 
-- HTTPS and auth for local repos
+- HTTPS for local repos
 - Renewing one's GPG key/switching which key the repo is signed with

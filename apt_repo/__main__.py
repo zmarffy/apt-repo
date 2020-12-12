@@ -14,6 +14,7 @@ import docker
 import magic
 import yaml
 import zmtools
+import zetuptools
 from reequirements import Requirement
 from tabulate import tabulate
 
@@ -70,6 +71,9 @@ def determine_arch(deb_file):
 def main():
 
     zmtools.init_logging()
+
+    if not os.path.isdir(os.path.join(os.path.expanduser("~"), ".python_installdirectives", "apt_repo")):
+        raise zetuptools.InstallDirectivesNotYetRunException()
 
     def _deb_file_transform(s):
         d = s.split(".deb:", 1)
