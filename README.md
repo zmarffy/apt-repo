@@ -1,6 +1,6 @@
-# `apt-repo`
+# `apt-repo-maker`
 
-`apt-repo` is a program to create and host an APT repo on your server or GitHub.
+`apt-repo-maker` is a program to create and host an APT repo on your server or GitHub.
 
 ## Requirements
 
@@ -17,7 +17,7 @@
 
 ## Setup
 
-0. Install the `pip` package and then run `install-directives apt-repo install`. Note that you must have permissions to use `docker`.
+0. This uses `install-directives` from [`zetuptools`](https://github.com/zmarffy/zetuptools). Install the `pip` package and then run `install-directives apt-repo-maker install`. Note that you must have permissions to use `docker`.
 
 1. Run `apt-repo setup`. Usage is as follows.
 

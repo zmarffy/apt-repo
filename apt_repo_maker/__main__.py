@@ -72,7 +72,7 @@ def main():
 
     zmtools.init_logging()
 
-    if not os.path.isdir(os.path.join(os.path.expanduser("~"), ".python_installdirectives", "apt_repo")):
+    if not os.path.isdir(os.path.join(os.path.expanduser("~"), ".python_installdirectives", "apt_repo_maker")):
         raise zetuptools.InstallDirectivesNotYetRunException()
 
     def _deb_file_transform(s):
