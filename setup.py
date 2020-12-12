@@ -31,7 +31,7 @@ setuptools.setup(
     ],
     entry_points={
         'console_scripts': [
-            'apt-repo = apt_repo.__main__:main',
+            'apt-repo = apt_repo_maker.__main__:main',
         ],
     },
     package_data=TOOLS.all_files,
