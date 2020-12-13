@@ -1,7 +1,6 @@
 import os
 from os.path import join as join_path
 
-import docker
 import setuptools
 import zetuptools
 from pkg_resources import resource_filename
