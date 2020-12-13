@@ -65,6 +65,8 @@
 
     The `-s` flag stops the repo from being served.
 
+**Note**: Before you uninstall this package, you should run `install-directives apt-repo-maker uninstall` to stop any served repos as well as delete the created Docker images.
+
 ## Other stuff you can do
 
 - List the packages in the repo
@@ -82,7 +84,7 @@
 - Getting low on space on a GitHub-hosted repo? Run the clean function
 
     ```text
-        apt-repo [-h] [-n NAME] [-l BASE_LOCATION] clean [-h]
+    apt-repo [-h] [-n NAME] [-l BASE_LOCATION] clean [-h]
     ```
 
 ## Tips
