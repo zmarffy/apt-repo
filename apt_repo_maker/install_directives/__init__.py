@@ -10,8 +10,8 @@ class InstallDirectives(zetuptools.InstallDirectives):
         self.package.build_docker_images()
 
     def _uninstall(self, version):
-        self.package.remove_docker_images()
         for repo in os.listdir(os.path.join(os.path.expanduser("~"), ".apt-repo")):
-            if os.path.isfile(os.path.join(repo, "containerid")):
+            if os.path.isfile(os.path.join(os.path.join(os.path.expanduser("~"), ".apt-repo", repo, "containerid"))):
                 subprocess.check_call(
                     ["apt-repo", "serve", "-n", repo, "-s"])
+        self.package.remove_docker_images()
