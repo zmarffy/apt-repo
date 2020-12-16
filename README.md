@@ -22,37 +22,43 @@
 1. Run `apt-repo setup`. Usage is as follows.
 
     ```text
-    usage: apt-repo [-h] [-n NAME] [-l BASE_LOCATION] setup [-h] [--splash SPLASH] config
+    usage: apt-repo [-h] [-n NAME] setup [-h] config
     ```
 
-    You may select a name for your repo or leave it blank for the default, "repo". This is what allows you to serve multiple repos on one server. You may also add an HTML splash page if you'd like. A JSON or YAML config file is the only required parameter, though. Here is an example of one.
+    You may select a name for your repo or leave it blank for the default, "repo". This is what allows you to serve multiple repos on one server. A JSON or YAML config file is the only required parameter. Here is an example of one.
 
-    ```json
-    {
-        "origin": "Zeke's APT repo",
-        "label": "zeke-repo",
-        "codename": "focal",
-        "arch": [
-            "amd64"
-        ],
-        "components": [
-            "main"
-        ],
-        "description": "Zeke's APT repo of random stuff he makes",
-        "host": "local"
-    }
+    ```yaml
+    ---
+    name: zekerepo
+    origin: Zeke's APT repo
+    label: zeke-repo
+    codename: focal
+    arch:
+      - amd64
+      - i386
+    components:
+      - main
+    description: Zeke's APT repo of random stuff he makes
+    host: local
+    splash: .files/splash.html
+    ssl:
+      key: .files/host.key
+      cert: .files/host.crt
+    port: 443
     ```
 
-    You can set a repo password with the key `repo_password`. This will enable baic authentication for the repo. The username is "repo".
+    Splash will set an HTML splash page for the repo. `ssl` is not a required key, but if provided, makes the repository use HTTPS. Duh. You can set a repo password with the key `repo_password`. This will enable basic authentication for the repo. The username is "repo".
 
-    Using "`github`" or "`github-private`" as "`host`" will create a repo on GitHub to host your APT repo in. Yes, this is weird. Yes, it works.
+    Any key that requires a file location is the location relative to where you are running `apt-repo` from.
+
+    Using "`github`" or "`github-private`" as `host` will create a repo on GitHub to host your APT repo in. Yes, this is weird. Yes, it works.
 
     **Note:** Do not specify "`all`" as an architecture here, even if you have packages that fit all architectures.
 
 2. Add some DEB files to the repo.
 
     ```text
-    apt-repo [-h] [-n NAME] [-l BASE_LOCATION] add_packages [-h] [-d] deb_files [deb_files ...]
+    apt-repo [-h] [-n NAME] add_packages [-h] [-d] deb_files [deb_files ...]
     ```
 
     **Note:** You can specify DEB files with just their filenames, or like "`[location]:[component]`"; for example: "`mydeb_1.0.0-1_all.deb:main`". Architecture will be determined automatically (by reading packages' actual architecture fields; not by assuming from their names).
@@ -60,10 +66,10 @@
 3. Serve the repo.
 
     ```text
-    apt-repo [-h] [-n NAME] [-l BASE_LOCATION] serve [-h] [-p PORT] [-s]
+    apt-repo [-h] [-n NAME] serve [-h] [-s]
     ```
 
-    The `-s` flag stops the repo from being served.
+    The `-s` flag stops the repo from being served. The port it is served on is specified in the config file when you first set it up.
 
 **Note**: Before you uninstall this package, you should run `install-directives apt-repo-maker uninstall` to stop any served repos as well as delete the created Docker images.
 
@@ -72,19 +78,19 @@
 - List the packages in the repo
 
     ```text
-    apt-repo [-h] [-n NAME] [-l BASE_LOCATION] list [-h] [--no_format]
+    apt-repo [-h] [-n NAME] list_packages [-h] [--no_format]
     ```
 
 - Remove packages in the repo
 
     ```text
-    apt-repo [-h] [-n NAME] [-l BASE_LOCATION] remove_packages [-h] packages [packages ...]
+    apt-repo [-h] [-n NAME] remove_packages [-h] packages [packages ...]
     ```
 
 - Getting low on space on a GitHub-hosted repo? Run the clean function
 
     ```text
-    apt-repo [-h] [-n NAME] [-l BASE_LOCATION] clean [-h]
+    apt-repo [-h] [-n NAME] clean [-h]
     ```
 
 ## Tips
@@ -108,7 +114,3 @@ deb https://[repo_host_username].github.io/[repo_name]/ [codename] [component]
 ```
 
 That's the whole point of GitHub pages, after all, that "nicer form".
-
-## Missing features
-
-- HTTPS for local repos

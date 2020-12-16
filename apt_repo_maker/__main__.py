@@ -94,8 +94,6 @@ def main():
 
     parser.add_argument(
         "-n", "--name", help="repo name (overridden by config's \"name\" key)")
-    parser.add_argument("-l", "--base_location", default=os.path.join(
-        os.path.expanduser("~"), "apt-repo"), help="base location for reprepro data")
 
     subparsers = parser.add_subparsers(dest="command", help="action to take")
 
@@ -103,13 +101,9 @@ def main():
         "setup", help="setup the repo for the first time")
     setup_parser.add_argument("config", type=os.path.abspath,
                               help="config json/yaml file location")
-    setup_parser.add_argument("--splash", type=os.path.abspath,
-                              help="HTML splash page location")
 
     serve_parser = subparsers.add_parser(
         "serve", help="start serving the repo")
-    serve_parser.add_argument("-p", "--port", default=8080,
-                              help="port to serve repo on")
     serve_parser.add_argument(
         "-s", "--stop", action="store_true", help="stop serving repo")
 
@@ -149,10 +143,10 @@ def main():
         if config["host"] not in VALID_HOSTS:
             raise ValueError(
                 f"Invalid value \"{config['host']}\" for key \"host\"")
-        if config["host"] == "github-private" and args.splash is not None:
+        if config["host"] == "github-private" and config.get("splash") is not None:
             LOGGER.warning(
-                "Ignoring --splash argument as splash pages are not supported for GitHub private repos")
-            args.splash = None
+                "Ignoring splash value as splash pages are not supported for GitHub private repos")
+            config["splash"] = None
         try:
             # Ignore -n
             NAME = config["name"]
@@ -160,7 +154,7 @@ def main():
         except KeyError:
             pass
 
-    BASE_LOCATION = args.base_location
+    BASE_LOCATION = os.path.join(os.path.expanduser("~"), "apt-repo")
 
     if args.command != "setup":
         if not os.path.isdir(BASE_LOCATION):
@@ -173,7 +167,11 @@ def main():
         if len(files) == 1:
             NAME = files[0]
 
-    REPO_FILES_LOCATION = os.path.join(BASE_LOCATION, NAME)
+    REPO_NAME_BASE_LOCATION = os.path.join(BASE_LOCATION, NAME)
+
+    REPO_FILES_LOCATION = os.path.join(REPO_NAME_BASE_LOCATION, "repo_files")
+    APACHE_FILES_LOCATION = os.path.join(
+        REPO_NAME_BASE_LOCATION, "apache_files")
     DOTAPTREPO_LOCATION = os.path.join(
         os.path.expanduser("~"), ".apt-repo", NAME)
     REPO_SETTINGS_LOCATION = os.path.join(
@@ -205,17 +203,27 @@ def main():
                 sys.exit("Setup aborted")
         # Make directories if necessary
         os.makedirs(REPO_FILES_LOCATION, exist_ok=True)
+        os.makedirs(APACHE_FILES_LOCATION, exist_ok=True)
         os.makedirs(DOTAPTREPO_LOCATION, exist_ok=True)
         SETTINGS = {
             "local": config["host"] == "local",
-            "password": config.get("repo_password", "")
+            "password": config.get("repo_password", ""),
+            "server_admin_email": config.get("server_admin_email", subprocess.check_output(["git", "config", "user.email"]).decode().strip()),
+            "use_ssl": bool(config.get("ssl")),
+            "port": config["port"],
         }
         with open(REPO_SETTINGS_LOCATION, "w") as f:
             f.write(yaml.dump(SETTINGS))
         # Copy the splash page
-        if args.splash is not None:
-            shutil.copy(args.splash, os.path.join(
+        if config.get("splash") is not None:
+            shutil.copy(config["splash"], os.path.join(
                 REPO_FILES_LOCATION, "index.html"))
+        # Copy the SSL stuff
+        if SETTINGS["use_ssl"]:
+            shutil.copy(config["ssl"]["key"], os.path.join(
+                APACHE_FILES_LOCATION, "server.key"))
+            shutil.copy(config["ssl"]["cert"], os.path.join(
+                APACHE_FILES_LOCATION, "server.crt"))
         try:
             # Attempt to get the GPG key from the config file
             key = config["key"]
@@ -282,13 +290,33 @@ SignWith: {}
             if not args.stop:
                 if os.path.isfile(os.path.join(DOTAPTREPO_LOCATION, "containerid")):
                     raise ValueError("Repo currently being served")
+                environment = {
+                    "SERVER_ADMIN_EMAIL": SETTINGS["server_admin_email"],
+                    "USE_SSL": SETTINGS["use_ssl"]
+                }
                 if SETTINGS["password"] != "":
-                    environment = {"REPO_PASSWORD": SETTINGS["password"]}
-                else:
-                    environment = None
+                    environment["REPO_PASSWORD"] = SETTINGS["password"]
                 client = docker.from_env()
-                container = client.containers.run("apt-repo", name=f"apt-repo_{NAME}", auto_remove=True, detach=True, ports={'80/tcp': args.port}, volumes={
-                                                  REPO_FILES_LOCATION: {"bind": os.path.join(os.sep, 'usr', 'local', 'apache2', 'htdocs'), "mode": 'ro'}}, environment=environment)
+                volumes = {
+                    REPO_FILES_LOCATION: {
+                        "bind": os.path.join(os.sep, "usr", "local", "apache2", "htdocs"),
+                        "mode": "ro"
+                    },
+                    APACHE_FILES_LOCATION: {
+                        "bind": os.path.join(os.sep, "usr", "local", "apache2", "mounted"),
+                        "mode": "rw"  # No idea why this is required, but it breaks if not read-write
+                    }
+                }
+                if not SETTINGS["use_ssl"]:
+                    ports = {
+                        "80/tcp": SETTINGS["port"]
+                    }
+                else:
+                    ports = {
+                        "443/tcp": SETTINGS["port"]
+                    }
+                container = client.containers.run(
+                    "apt-repo", name=f"apt-repo_{NAME}", auto_remove=True, detach=True, ports=ports, volumes=volumes, environment=environment)
                 with open(os.path.join(DOTAPTREPO_LOCATION, "containerid"), "w") as f:
                     f.write(container.id)
             else:
