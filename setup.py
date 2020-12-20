@@ -26,7 +26,7 @@ setuptools.setup(
         'pyyaml',
         'tabulate',
         'zmtools>=1.6.0',
-        'zetuptools>=2.1.0'
+        'zetuptools>=2.2.0'
     ],
     entry_points={
         'console_scripts': [

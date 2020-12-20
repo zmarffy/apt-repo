@@ -72,7 +72,7 @@ def main():
 
     zmtools.init_logging()
 
-    if not os.path.isdir(os.path.join(os.path.expanduser("~"), ".python_installdirectives", "apt_repo_maker")):
+    if not os.path.isdir(os.path.join(os.path.expanduser("~"), ".python_installdirectives", "apt-repo-maker")):
         raise zetuptools.InstallDirectivesNotYetRunException()
 
     def _deb_file_transform(s):
@@ -207,8 +207,8 @@ def main():
         os.makedirs(DOTAPTREPO_LOCATION, exist_ok=True)
         SETTINGS = {
             "local": config["host"] == "local",
-            "password": config.get("repo_password", ""),
-            "server_admin_email": config.get("server_admin_email", subprocess.check_output(["git", "config", "user.email"]).decode().strip()),
+            "password": config.get("repo_password"),
+            "server_admin_email": config.get("server_admin_email"),
             "use_ssl": bool(config.get("ssl")),
             "port": config["port"],
         }
