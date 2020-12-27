@@ -47,9 +47,9 @@
     port: 443
     ```
 
-    Splash will set an HTML splash page for the repo. `ssl` is not a required key, but if provided, makes the repository use HTTPS. Duh. You can set a repo password with the key `repo_password`. This will enable basic authentication for the repo. The username is "repo".
+    `splash` will set an HTML splash page for the repo. `ssl` is not a required key, but if provided, makes the repository use HTTPS. Duh. You can set a repo password with the key `repo_password`. This will enable basic authentication for the repo. The username is "repo".
 
-    Any key that requires a file location is the location relative to where you are running `apt-repo` from.
+    Any key that requires a file location (such as `splash`) uses the location relative to where you are running `apt-repo` from, NOT relative to the config file.
 
     Using "`github`" or "`github-private`" as `host` will create a repo on GitHub to host your APT repo in. Yes, this is weird. Yes, it works.
 
