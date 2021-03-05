@@ -1,23 +1,23 @@
 import os
-from os.path import join as join_path
+import re
 
 import setuptools
-import zetuptools
-from pkg_resources import resource_filename
 
-TOOLS = zetuptools.SetuptoolsExtensions("apt-repo-maker", "Zeke Marffy", "zmarffy@yahoo.com")
+with open(os.path.join("apt_repo_maker", "__init__.py"), encoding="utf8") as f:
+    version = re.search(r'__version__ = "(.*?)"', f.read()).group(1)
 
+packages = setuptools.find_packages()
 
 setuptools.setup(
-    name=TOOLS.name,
-    version=TOOLS.version,
-    author=TOOLS.author,
-    author_email=TOOLS.author_email,
-    packages=setuptools.find_packages(),
+    name="apt-repo-maker",
+    version=version,
+    author="Zeke Marffy",
+    author_email="zmarffy@yahoo.com",
+    packages=packages,
     url='https://github.com/zmarffy/apt-repo',
     license='MIT',
     description='Host APT repos on your server or GitHub',
-    python_requires=TOOLS.minimum_version_required,
+    python_requires='>=3.6',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     install_requires=[
@@ -33,5 +33,5 @@ setuptools.setup(
             'apt-repo = apt_repo_maker.__main__:main',
         ],
     },
-    package_data=TOOLS.all_files,
+    package_data={package: ["*"] for package in packages},
 )
