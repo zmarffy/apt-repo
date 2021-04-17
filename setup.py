@@ -22,7 +22,6 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     install_requires=[
         'reequirements',
-        'python-magic',
         'pyyaml',
         'tabulate',
         'zmtools>=1.6.0',

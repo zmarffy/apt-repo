@@ -1,71 +1,24 @@
 #! /usr/bin/env python3
 
 import argparse
-import json
 import logging
 import os
 import re
 import shutil
 import subprocess
 import sys
-from typing import Dict, List
 import uuid
 
 import docker
-import magic
 import yaml
 import zetuptools
 import zmtools
 from tabulate import tabulate
 
-# TODO: Seperate some stuff out into seperate files
-
-LIST_OUTPUT_KEYS = (
-    "codename",
-    "component",
-    "arch",
-    "name",
-    "version"
-)
-VALID_HOSTS = (
-    "local",
-    "github",
-    "github-private"
-)
+from .constants import DISTRIBUTIONS_STRING, VALID_HOSTS
+from .helpers import _deb_file_transform, list_packages_available
 
 LOGGER = logging.getLogger()
-
-
-def list_packages_available(codename: str, repo_files_location: str) -> List[Dict[str, str]]:
-    """Return a dict of info about the packages available in the repo
-
-    Args:
-        codename (str): List packages of this codename
-        repo_files_location (str): Location of the repo files
-
-    Returns:
-        List[Dict[str, str]]: Info about the packages available
-    """
-    o = subprocess.check_output(
-        ["reprepro", "-b", repo_files_location, "list", codename]).decode().strip()
-    if o == "":
-        # No debs
-        return []
-    else:
-        # Parse the output and return a list of dicts
-        return [dict(zip(LIST_OUTPUT_KEYS, p)) for p in [b[0].split("|") + b[1].split(" ", 1) for b in [d0.split(": ", 1) for d0 in o.split("\n")]]]
-
-
-def determine_arch(deb_file: str) -> str:
-    """Determine the architecture of a DEB file
-
-    Args:
-        deb_file (str): Location of DEB file
-
-    Returns:
-        str: The architecture
-    """
-    return re.findall("(?<=Architecture: ).+", subprocess.check_output(["dpkg", "--info", deb_file]).decode())[0]
 
 
 def main() -> int:
@@ -74,21 +27,6 @@ def main() -> int:
 
     if not os.path.isdir(os.path.join(os.path.expanduser("~"), ".python_installdirectives", "apt-repo-maker")):
         raise zetuptools.InstallDirectivesNotYetRunException()
-
-    def _deb_file_transform(s):
-        d = s.split(".deb:", 1)
-        if len(d) == 2:
-            f = d[0] + ".deb"
-            c = d[1]
-        else:
-            f = s
-            c = None
-        a = determine_arch(f)
-        if c is None:
-            c = input(f"{f} component: ")
-            if not c:
-                raise ValueError("Empty component")
-        return f, c, a
 
     parser = argparse.ArgumentParser()
 
@@ -99,8 +37,8 @@ def main() -> int:
 
     setup_parser = subparsers.add_parser(
         "setup", help="setup the repo for the first time")
-    setup_parser.add_argument("config", type=os.path.abspath,
-                              help="config json/yaml file location")
+    setup_parser.add_argument(
+        "config", type=os.path.abspath, help="config YAML file location")
 
     serve_parser = subparsers.add_parser(
         "serve", help="start serving the repo")
@@ -110,7 +48,7 @@ def main() -> int:
     add_packages_parser = subparsers.add_parser(
         "add_packages", help="add DEBs to the repo")
     add_packages_parser.add_argument("deb_files", nargs="+", type=_deb_file_transform,
-                                     help="DEB files to add (either just their locations, or [location]:[component])")
+                                     help="DEB files to add (either just their locations, or <location>:<component>)")
 
     remove_packages_parser = subparsers.add_parser(
         "remove_packages", help="removes packages from the repo")
@@ -134,11 +72,7 @@ def main() -> int:
     name_from_config = False
     if args.command == "setup":
         with open(args.config, "r") as f:
-            if magic.from_file(args.config).endswith("json"):
-                config = json.load(f)
-            else:
-                # Why not?
-                config = yaml.load(f, Loader=yaml.FullLoader)
+            config = yaml.load(f, Loader=yaml.FullLoader)
         # Validate settings
         if config["host"] not in VALID_HOSTS:
             raise ValueError(
@@ -208,7 +142,7 @@ def main() -> int:
         SETTINGS = {
             "local": config["host"] == "local",
             "password": config.get("repo_password"),
-            "server_admin_email": config.get("server_admin_email"),
+            "server_admin_email": config["server_admin_email"],
             "use_ssl": bool(config.get("ssl")),
             "port": config["port"],
         }
@@ -257,16 +191,9 @@ def main() -> int:
         subprocess.check_call(["gpg", "--armor", "--output", os.path.join(
             REPO_FILES_LOCATION, f"{public_key_file_name}.gpg.key"), "--export", key])
         os.makedirs(os.path.join(os.path.join(REPO_FILES_LOCATION, "conf")))
-        distributions_string = """Origin: {}
-Label: {}
-Codename: {}
-Architectures: {}
-Components: {}
-Description: {}
-SignWith: {}
-"""
+
         with open(os.path.join(REPO_FILES_LOCATION, "conf", "distributions"), "w") as f:
-            f.write(distributions_string.format(config["origin"], config["label"], config["codename"], " ".join(
+            f.write(DISTRIBUTIONS_STRING.format(config["origin"], config["label"], config["codename"], " ".join(
                 config["arch"]), " ".join(config["components"]), config["description"], key))
         if config["host"] != "local":
             if "private" in config["host"]:
@@ -425,6 +352,7 @@ SignWith: {}
     else:
         parser.print_help()
         parser.error("Invalid command")
+
     return 0
 
 

@@ -7,13 +7,6 @@
 - `docker`
 - `gh`
 - `gpg`
-- `python3`
-- `python-magic` (a `pip` package)
-- `pyyaml` (a `pip` package)
-- `reequirements` (a `pip` package)
-- `tabulate` (a `pip` package)
-- `zmtools` (a `pip` package)
-- `zetuptools` (a `pip` package)
 
 ## Setup
 
@@ -25,7 +18,7 @@
     usage: apt-repo [-h] [-n NAME] setup [-h] config
     ```
 
-    You may select a name for your repo or leave it blank for the default, "repo". This is what allows you to serve multiple repos on one server. A JSON or YAML config file is the only required parameter. Here is an example of one.
+    You may select a name for your repo or leave it blank for the default, "repo". This is what allows you to serve multiple repos on one server. A YAML config file is the only required parameter. Here is an example of one.
 
     ```yaml
     ---
@@ -39,6 +32,7 @@
     components:
       - main
     description: Zeke's APT repo of random stuff he makes
+    server_admin_email: zmarffy@yahoo.com
     host: local
     splash: .files/splash.html
     ssl:
