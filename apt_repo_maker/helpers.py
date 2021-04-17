@@ -1,11 +1,11 @@
 import re
 import subprocess
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from .constants import LIST_OUTPUT_KEYS
 
 
-def _deb_file_transform(s: str):
+def _deb_file_transform(s: str) -> Tuple[str, str, str]:
     """From a string formatted like "<filename>" or "<filename>:<component>", return a DEB file's name and component, and if the component is not specified, ask for it.
 
     Args:
