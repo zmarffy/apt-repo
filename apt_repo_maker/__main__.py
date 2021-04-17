@@ -8,14 +8,14 @@ import re
 import shutil
 import subprocess
 import sys
+from typing import Dict, List
 import uuid
 
 import docker
 import magic
 import yaml
-import zmtools
 import zetuptools
-from reequirements import Requirement
+import zmtools
 from tabulate import tabulate
 
 # TODO: Seperate some stuff out into seperate files
@@ -36,15 +36,15 @@ VALID_HOSTS = (
 LOGGER = logging.getLogger()
 
 
-def list_packages_available(codename, repo_files_location):
+def list_packages_available(codename: str, repo_files_location: str) -> List[Dict[str, str]]:
     """Return a dict of info about the packages available in the repo
 
     Args:
-        codename (string): List packages of this codename
-        repo_files_location (string): Location of the repo files
+        codename (str): List packages of this codename
+        repo_files_location (str): Location of the repo files
 
     Returns:
-        list[dict]: Info about the packages available
+        List[Dict[str, str]]: Info about the packages available
     """
     o = subprocess.check_output(
         ["reprepro", "-b", repo_files_location, "list", codename]).decode().strip()
@@ -56,19 +56,19 @@ def list_packages_available(codename, repo_files_location):
         return [dict(zip(LIST_OUTPUT_KEYS, p)) for p in [b[0].split("|") + b[1].split(" ", 1) for b in [d0.split(": ", 1) for d0 in o.split("\n")]]]
 
 
-def determine_arch(deb_file):
+def determine_arch(deb_file: str) -> str:
     """Determine the architecture of a DEB file
 
     Args:
-        deb_file (string): Location of DEB file
+        deb_file (str): Location of DEB file
 
     Returns:
-        string: The architecture
+        str: The architecture
     """
     return re.findall("(?<=Architecture: ).+", subprocess.check_output(["dpkg", "--info", deb_file]).decode())[0]
 
 
-def main():
+def main() -> int:
 
     zmtools.init_logging()
 
