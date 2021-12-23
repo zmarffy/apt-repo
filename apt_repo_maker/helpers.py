@@ -1,11 +1,16 @@
 import re
 import subprocess
-from typing import Dict, List, Tuple
 
-from .constants import LIST_OUTPUT_KEYS
+LIST_OUTPUT_KEYS = [
+    "codename",
+    "component",
+    "arch",
+    "name",
+    "version"
+]
 
 
-def _deb_file_transform(s: str) -> Tuple[str, str, str]:
+def _deb_file_transform(s: str) -> tuple[str, str, str]:
     """From a string formatted like "<filename>" or "<filename>:<component>", return a DEB file's name and component, and if the component is not specified, ask for it.
 
     Args:
@@ -26,7 +31,7 @@ def _deb_file_transform(s: str) -> Tuple[str, str, str]:
     return f, c, a
 
 
-def list_packages_available(codename: str, repo_files_location: str) -> List[Dict[str, str]]:
+def list_packages_available(codename: str, repo_files_location: str) -> list[dict[str, str]]:
     """Return a dict of info about the packages available in the repo
 
     Args:

@@ -1,5 +1,5 @@
 import os
-import subprocess
+import docker
 import shutil
 
 import zetuptools
@@ -18,16 +18,16 @@ for requirement in REQUIREMENTS:
 
 class InstallDirectives(zetuptools.InstallDirectives):
 
-    package_name = "apt-repo-maker"
+    def __init__(self) -> None:
+        super().__init__("apt-repo-maker", data_folder=os.path.join(os.path.expanduser("~"),
+                                                                    ".apt-repo"), docker_images=["apt-repo"])
 
-    def _install(self, old_version, new_version):
+    def _install(self, old_version, new_version) -> None:
+        # Two data folders because I made this a long time ago
+        os.makedirs(os.path.join(os.path.expanduser(
+            "~"), "apt-repo"), exist_ok=True)
         self.build_docker_images()
 
-    def _uninstall(self, version):
-        for repo in os.listdir(os.path.join(os.path.expanduser("~"), ".apt-repo")):
-            if os.path.isfile(os.path.join(os.path.join(os.path.expanduser("~"), ".apt-repo", repo, "containerid"))):
-                subprocess.check_call(
-                    ["apt-repo", "-n", repo, "serve", "-s"])
-        shutil.rmtree(os.path.join(os.path.expanduser("~"),
-                                   "apt-repo"))  # The other data folder
+    def _uninstall(self, version) -> None:
         self.remove_docker_images()
+        shutil.rmtree(os.path.join(os.path.expanduser("~"), "apt-repo"))
