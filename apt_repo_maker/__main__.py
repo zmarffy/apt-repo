@@ -91,14 +91,29 @@ def main() -> int:
         if config["host"] not in VALID_HOSTS:
             raise ValueError(
                 f"Invalid value \"{config['host']}\" for key \"host\"")
-        if "github" in config["host"] and config.get("ssl") is not None:
-            LOGGER.warning(
-                "Ignoring ssl value as ssl does not make sense in the context of GitHub repos")
-            config["ssl"] = None
-        if config["host"] == "github-private" and config.get("splash") is not None:
-            LOGGER.warning(
-                "Ignoring splash value as splash pages are not supported for GitHub private repos")
-            config["splash"] = None
+        is_github = "github" in config["host"]
+        port_specified = config.get("port") is not None
+        ssl_specified = config.get("ssl") is not None
+        if port_specified:
+            if is_github:
+                LOGGER.warning(
+                    "Ignoring port value as port does not make sense in the context of GitHub repos")
+                config["port"] = None
+        if is_github:
+            if ssl_specified:
+                LOGGER.warning(
+                    "Ignoring ssl value as ssl does not make sense in the context of GitHub repos")
+                config["ssl"] = None
+            if "private" in config["host"] and config.get("splash") is not None:
+                LOGGER.warning(
+                    "Ignoring splash value as splash pages are not supported for GitHub private repos")
+                config["splash"] = None
+        else:
+            if not port_specified:
+                if ssl_specified:
+                    config["port"] = 443
+                else:
+                    config["port"] = 80
         try:
             # Ignore -n
             NAME = config["name"]
@@ -210,7 +225,8 @@ def main() -> int:
                 subprocess.check_call(["git", "init"])
                 subprocess.check_call(["gh", "repo", "create", NAME, f"--{repo_type}", "--description",
                                       "APT repo", "--disable-issues", "--disable-wiki", "--source=.", "--remote=origin"])
-                subprocess.check_call(["git", "checkout", "-q", "-b", "gh-pages"])
+                subprocess.check_call(
+                    ["git", "checkout", "-q", "-b", "gh-pages"])
                 subprocess.check_call(["git", "add", "--all"])
                 subprocess.check_call(
                     ["git", "commit", "-m", "set up repo", "-a"])
@@ -294,7 +310,8 @@ def main() -> int:
                 if not SETTINGS["local"]:
                     # Push to GitHub
                     with zmtools.working_directory(REPO_FILES_LOCATION):
-                        subprocess.check_call(["git", "checkout", "-q", "gh-pages"])
+                        subprocess.check_call(
+                            ["git", "checkout", "-q", "gh-pages"])
                         subprocess.check_call(["git", "add", "--all"])
                         subprocess.check_call(
                             ["git", "commit", "-m", "update repo", "-a"])
@@ -319,7 +336,8 @@ def main() -> int:
                 if not SETTINGS["local"]:
                     # Push to GitHub
                     with zmtools.working_directory(REPO_FILES_LOCATION):
-                        subprocess.check_call(["git", "checkout", "-q", "gh-pages"])
+                        subprocess.check_call(
+                            ["git", "checkout", "-q", "gh-pages"])
                         subprocess.check_call(["git", "add", "--all"])
                         subprocess.check_call(
                             ["git", "commit", "-m", "update repo", "-a"])
