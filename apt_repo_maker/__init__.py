@@ -1,2 +1,2 @@
-__version__ = "1.3.2"
-__dev__ = True
+__version__ = "2.0.0"
+__dev__ = False
