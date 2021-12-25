@@ -108,3 +108,8 @@ deb https://<repo_host_username>.github.io/<repo_name>/ <codename> <component>
 ```
 
 That's the whole point of GitHub pages, after all, that "nicer form".
+
+## Notes
+
+- If you don't have something to run this on, you can always use the provided `Vagrantfile`. Just make sure you update `vagrant_files/.env`
+- At some point I may refactor this to use microservices or something
