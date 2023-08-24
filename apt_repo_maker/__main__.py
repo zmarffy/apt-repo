@@ -1,27 +1,15 @@
 import argparse
 import logging
-import os
 import re
 import shutil
 import subprocess
 import sys
-import uuid
+from pathlib import Path
 
-import docker
-import yaml
-import zetuptools
 import zmtools
 from tabulate import tabulate
 
-from .helpers import _deb_file_transform, list_packages_available
-
 LOGGER = logging.getLogger()
-
-VALID_HOSTS = [
-    "local",
-    "github",
-    "github-private"
-]
 
 DISTRIBUTIONS_STRING = """Origin: {}
 Label: {}
@@ -33,351 +21,330 @@ SignWith: {}
 """
 
 
+def _get_distributions_text(repo_files_location: Path) -> str:
+    with open(Path(repo_files_location, "conf", "distributions"), "r") as f:
+        return f.read()
+
+
+def _get_codename(distributions_text: str) -> str:
+    return re.findall(r"(?<=Codename: ).+", distributions_text)[0]
+
+
+def _get_allarch(distributions_text: str) -> str:
+    return re.findall(r"(?<=Architectures: ).+", distributions_text)[0].replace(
+        " ", "|"
+    )
+
+
+def _check_exists_and_return_path(p: str) -> Path:
+    path = Path(p)
+    if path.exists():
+        return path
+    else:
+        raise FileNotFoundError(p)
+
+
+def _deb_file_transform(s: str) -> tuple[str, str, str]:
+    f, c = re.search(r"(.+\.deb$)(?::(.+))?", s).groups()
+    a = re.findall(
+        "(?<=Architecture: ).+",
+        subprocess.run(["dpkg", "--info", f], capture_output=True, text=True).stdout,
+    )[0]
+    if c is None:
+        c = input(f"{f} component: ")
+        if not c:
+            raise ValueError("Empty component")
+    return f, c, a
+
+
+def _update_repo(repo_files_location: str, clean: bool = False) -> None:
+    with zmtools.working_directory(repo_files_location):
+        remote = subprocess.check_output(
+            ["git", "config", "--get", "remote.origin.url"]
+        )
+        if clean:
+            dash_b = ["-b"]
+            shutil.rmtree(".git")
+            subprocess.run(["git", "init"], check=True)
+            subprocess.run(["git", "remote", "add", "origin", remote], check=True)
+        else:
+            dash_b = []
+        subprocess.run(["git", "checkout", "-q"] + dash_b + ["gh-pages"], check=True)
+        subprocess.run(["git", "add", "--all"], check=True)
+        subprocess.run(["git", "commit", "-m", "update repo", "-a"], check=True)
+        subprocess.run(["git", "push", "origin", "gh-pages", "--force"], check=True)
+
+
+def list_packages_available(
+    codename: str, repo_files_location: str
+) -> list[dict[str, str]]:
+    """Return a dict of info about the packages available in the repo.
+
+    Args:
+        codename (str): List packages of this codename.
+        repo_files_location (str): Location of the repo files.
+
+    Returns:
+        List[Dict[str, str]]: Info about the packages available.
+    """
+    o = subprocess.run(
+        ["reprepro", "-b", repo_files_location, "list", codename],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if o == "":
+        # No debs
+        return []
+    else:
+        # Parse the output and return a list of dicts
+        return [
+            dict(zip(["codename", "component", "arch", "name", "version"], p))
+            for p in [
+                b[0].split("|") + b[1].split(" ", 1)
+                for b in [d0.split(": ", 1) for d0 in o.split("\n")]
+            ]
+        ]
+
+
 def main() -> int:
-
-    zmtools.init_logging()
-
-    if not os.path.isdir(os.path.join(os.path.expanduser("~"), ".python_installdirectives", "apt-repo-maker")):
-        raise zetuptools.InstallDirectivesNotYetRunException()
-
     parser = argparse.ArgumentParser()
 
-    parser.add_argument(
-        "-n", "--name", help="repo name (overridden by config's \"name\" key)")
+    parser.add_argument("name")
 
     subparsers = parser.add_subparsers(dest="command", help="action to take")
 
     setup_parser = subparsers.add_parser(
-        "setup", help="setup the repo for the first time")
+        "setup", help="setup the repo for the first time"
+    )
     setup_parser.add_argument(
-        "config", type=os.path.abspath, help="config YAML file location")
-
-    serve_parser = subparsers.add_parser(
-        "serve", help="start serving the repo")
-    serve_parser.add_argument(
-        "-s", "--stop", action="store_true", help="stop serving repo")
+        "--public-key",
+        required=True,
+        type=_check_exists_and_return_path,
+        help="public key to copy to repo",
+    )
+    setup_parser.add_argument(
+        "--private-key",
+        required=True,
+        help="private key to sign packages with",
+    )
+    setup_parser.add_argument("--description", required=True)
+    setup_parser.add_argument("--origin", required=True)
+    setup_parser.add_argument("--label", required=True)
+    setup_parser.add_argument("--codename", required=True)
+    setup_parser.add_argument("--arch", nargs="+", required=True)
+    setup_parser.add_argument("--component", nargs="+", required=True)
+    setup_parser.add_argument(
+        "--splash",
+        type=_check_exists_and_return_path,
+        help="HTML splash page for the repo",
+    )
+    setup_parser.add_argument(
+        "--private", action="store_true", help="make repo private"
+    )
 
     add_packages_parser = subparsers.add_parser(
-        "add_packages", help="add DEBs to the repo")
-    add_packages_parser.add_argument("deb_files", nargs="+", type=_deb_file_transform,
-                                     help="DEB files to add (either just their locations, or <location>:<component>)")
+        "add-packages", help="add DEBs to the repo"
+    )
+    add_packages_parser.add_argument(
+        "debs",
+        nargs="+",
+        type=lambda x: _deb_file_transform(str(_check_exists_and_return_path(x))),
+        help="DEB files to add (either just their locations, or <location>:<component>)",
+    )
 
     remove_packages_parser = subparsers.add_parser(
-        "remove_packages", help="removes packages from the repo")
+        "remove-packages", help="remove packages from the repo"
+    )
     remove_packages_parser.add_argument(
-        "packages", nargs="+", help="packages to remove")
+        "packages", nargs="+", help="packages to remove"
+    )
 
     list_packages_parser = subparsers.add_parser(
-        "list_packages", help="list DEBs in the repo")
+        "list-packages", help="list DEBs in the repo"
+    )
     list_packages_parser.add_argument(
-        "--no_format", action="store_true", help="do not pretty-print list")
+        "--no-format", action="store_true", help="do not pretty-print list"
+    )
 
-    subparsers.add_parser(
-        "clean", help="clean GitHub-hosted repo (may take a while)")
+    subparsers.add_parser("clean", help="clean repo (may take a while)")
 
     args = parser.parse_args()
 
     if args.command is None:
         parser.error("Need to specify a command")
 
-    NAME = args.name
-    name_from_config = False
-
-    # TODO: A massive refactor, breaking these actions out into functions
-    if args.command == "setup":
-        with open(args.config, "r") as f:
-            config = yaml.load(f, Loader=yaml.FullLoader)
-        # Validate settings
-        if config["host"] not in VALID_HOSTS:
-            raise ValueError(
-                f"Invalid value \"{config['host']}\" for key \"host\"")
-        is_github = "github" in config["host"]
-        port_specified = config.get("port") is not None
-        ssl_specified = config.get("ssl") is not None
-        if port_specified:
-            if is_github:
-                LOGGER.warning(
-                    "Ignoring port value as port does not make sense in the context of GitHub repos")
-                config["port"] = None
-        if is_github:
-            if ssl_specified:
-                LOGGER.warning(
-                    "Ignoring ssl value as ssl does not make sense in the context of GitHub repos")
-                config["ssl"] = None
-            if "private" in config["host"] and config.get("splash") is not None:
-                LOGGER.warning(
-                    "Ignoring splash value as splash pages are not supported for GitHub private repos")
-                config["splash"] = None
-        else:
-            if not port_specified:
-                if ssl_specified:
-                    config["port"] = 443
-                else:
-                    config["port"] = 80
-        try:
-            # Ignore -n
-            NAME = config["name"]
-            name_from_config = True
-        except KeyError:
-            pass
-
-    BASE_LOCATION = os.path.join(os.path.expanduser("~"), "apt-repo")
+    BASE_LOCATION = Path(Path.home(), "apt-repo")
+    REPO_NAME_BASE_LOCATION = Path(BASE_LOCATION, args.name)
 
     if args.command != "setup":
-        if not os.path.isdir(BASE_LOCATION):
+        if not REPO_NAME_BASE_LOCATION.is_dir():
             raise FileNotFoundError(
-                f"{BASE_LOCATION} does not exist; please run apt-repo setup first")
+                f"{REPO_NAME_BASE_LOCATION} does not exist; please run `apt-repo {args.name} setup` first"
+            )
 
-    if not name_from_config and NAME is None:
-        NAME = zmtools.picker(os.listdir(BASE_LOCATION), "repo")
-
-    REPO_NAME_BASE_LOCATION = os.path.join(BASE_LOCATION, NAME)
-
-    REPO_FILES_LOCATION = os.path.join(REPO_NAME_BASE_LOCATION, "repo_files")
-    APACHE_FILES_LOCATION = os.path.join(
-        REPO_NAME_BASE_LOCATION, "apache_files")
-    DOTAPTREPO_LOCATION = os.path.join(
-        os.path.expanduser("~"), ".apt-repo", NAME)
-    REPO_SETTINGS_LOCATION = os.path.join(
-        DOTAPTREPO_LOCATION, "settings.yaml")
+    REPO_FILES_LOCATION = Path(REPO_NAME_BASE_LOCATION, "repo_files")
 
     if args.command == "setup":
-        # Completely wipe the repo if the user wants to
+        # If necessary and the user wants to, completely wipe the repo
         try:
-            setup_already = bool(os.listdir(REPO_FILES_LOCATION))
+            setup_already = bool(next(REPO_FILES_LOCATION.iterdir(), None))
         except FileNotFoundError:
             setup_already = False
         if setup_already:
-            if zmtools.y_to_continue(f"Repo already set up at {REPO_FILES_LOCATION}; wipe and start over? (y/n)") and zmtools.y_to_continue("Are you REALLY sure you want to wipe the repo? There is no going back from this. (y/n)"):
-                # If this doesn't work, it's probably not your repo :)
+            if zmtools.y_to_continue(
+                f"Repo already set up at {REPO_NAME_BASE_LOCATION}; wipe and start over? (y/n)"
+            ) and zmtools.y_to_continue(
+                "Are you REALLY sure you want to wipe the repo? There is no going back from this. (y/n)"
+            ):
                 shutil.rmtree(REPO_NAME_BASE_LOCATION)
-                shutil.rmtree(DOTAPTREPO_LOCATION)
             else:
                 sys.exit("Setup aborted")
-        # Make directories if necessary
-        os.makedirs(REPO_FILES_LOCATION, exist_ok=True)
-        os.makedirs(APACHE_FILES_LOCATION, exist_ok=True)
-        os.makedirs(DOTAPTREPO_LOCATION, exist_ok=True)
-        SETTINGS = {
-            "local": config["host"] == "local",
-            "password": config.get("repo_password"),
-            "server_admin_email": config["server_admin_email"],
-            "use_ssl": bool(config.get("ssl")),
-            "port": config["port"],
-        }
-        with open(REPO_SETTINGS_LOCATION, "w") as f:
-            f.write(yaml.dump(SETTINGS))
-        # Copy the splash page
-        if config.get("splash") is not None:
-            shutil.copy(config["splash"], os.path.join(
-                REPO_FILES_LOCATION, "index.html"))
-        # Copy the SSL stuff
-        if SETTINGS["use_ssl"]:
-            shutil.copy(config["ssl"]["key"], os.path.join(
-                APACHE_FILES_LOCATION, "server.key"))
-            shutil.copy(config["ssl"]["cert"], os.path.join(
-                APACHE_FILES_LOCATION, "server.crt"))
-        try:
-            # Attempt to get the GPG key from the config file
-            key = config["key"]
-            try:
-                subprocess.check_call(
-                    ["gpg", "--list-key", key], stdout=subprocess.DEVNULL)
-            except subprocess.CalledProcessError as e:
-                if e.returncode == 2:
-                    raise FileNotFoundError(
-                        f"Key {key} does not exist") from None
-                else:
-                    raise e
-        except KeyError:
-            # If the GPG key is not in the config file, ask to generate one or pick one
-            create_new_key = zmtools.y_to_continue(
-                "Would you like to create a new GPG key to sign your DEBs?")
-            if create_new_key:
-                subprocess.check_call(["gpg", "--gen-key"])
-            out = subprocess.check_output(
-                ["gpg", "--list-keys"]).decode().strip()
-            # Extract the keys using regex
-            keys = [k.strip() for k in re.findall(r"(?<=]\n).+", out)]
-            if create_new_key:
-                # Get the created one
-                key = keys[-1]
-            else:
-                key = zmtools.picker(keys, item_name="key")
-        # Generate a random name for the public key; maybe change this in the future?
-        public_key_file_name = str(uuid.uuid4()).replace("-", "")
-        # Set up the repo
-        subprocess.check_call(["gpg", "--armor", "--output", os.path.join(
-            REPO_FILES_LOCATION, f"{public_key_file_name}.gpg.key"), "--export", key])
-        os.makedirs(os.path.join(os.path.join(REPO_FILES_LOCATION, "conf")))
 
-        with open(os.path.join(REPO_FILES_LOCATION, "conf", "distributions"), "w") as f:
-            f.write(DISTRIBUTIONS_STRING.format(config["origin"], config["label"], config["codename"], " ".join(
-                config["arch"]), " ".join(config["components"]), config["description"], key))
-        if config["host"] != "local":
-            if "private" in config["host"]:
-                repo_type = "private"
+        # Make directories if necessary
+        REPO_FILES_LOCATION.mkdir(parents=True, exist_ok=True)
+
+        # Copy the splash page
+        if args.splash:
+            if args.private:
+                LOGGER.warning(
+                    "Ignoring splash value as splash pages are not supported for GitHub private repos"
+                )
             else:
-                repo_type = "public"
-            LOGGER.warning(
-                "You are using GitHub to host your repo; your files must not exceed 100 MB and the entire repo must not exceed 100 GB")
-            with zmtools.working_directory(REPO_FILES_LOCATION):
-                subprocess.check_call(["git", "init"])
-                subprocess.check_call(["gh", "repo", "create", NAME, f"--{repo_type}", "--description",
-                                      "APT repo", "--disable-issues", "--disable-wiki", "--source=.", "--remote=origin"])
-                subprocess.check_call(
-                    ["git", "checkout", "-q", "-b", "gh-pages"])
-                subprocess.check_call(["git", "add", "--all"])
-                subprocess.check_call(
-                    ["git", "commit", "-m", "set up repo", "-a"])
-                subprocess.check_call(["git", "push", "origin", "gh-pages"])
+                shutil.copy(args.splash, Path(REPO_FILES_LOCATION, "index.html"))
+
+        # Copy the public key
+        shutil.copy(args.public_key, Path(REPO_FILES_LOCATION, "repo.key"))
+
+        Path(REPO_FILES_LOCATION, "conf").mkdir(parents=True, exist_ok=True)
+        with open(Path(REPO_FILES_LOCATION, "conf", "distributions"), "w") as f:
+            f.write(
+                DISTRIBUTIONS_STRING.format(
+                    args.origin,
+                    args.label,
+                    args.codename,
+                    " ".join(args.arch),
+                    " ".join(args.component),
+                    args.description,
+                    args.private_key,
+                )
+            )
+        if args.private:
+            repo_type = "private"
+        else:
+            repo_type = "public"
+        with zmtools.working_directory(REPO_FILES_LOCATION):
+            subprocess.run(["git", "init"], check=True)
+            subprocess.run(
+                [
+                    "gh",
+                    "repo",
+                    "create",
+                    args.name,
+                    f"--{repo_type}",
+                    "--description",
+                    args.description,
+                    "--disable-issues",
+                    "--disable-wiki",
+                    "--source=.",
+                    "--remote=origin",
+                ],
+                check=True,
+            )
+            subprocess.run(["git", "checkout", "-q", "-b", "gh-pages"], check=True)
+            subprocess.run(["git", "add", "--all"], check=True)
+            subprocess.run(["git", "commit", "-m", "set up repo", "-a"], check=True)
+            subprocess.run(["git", "push", "origin", "gh-pages"], check=True)
+
+    elif args.command == "add-packages":
+        distributions_text = _get_distributions_text(REPO_FILES_LOCATION)
+        codename = _get_codename(distributions_text)
+        if not Path(REPO_FILES_LOCATION, "db").is_dir():
+            # First time run edge case
+            original_debs_list = []
+        else:
+            original_debs_list = list_packages_available(codename, REPO_FILES_LOCATION)
+        for deb_file, component, arch_ in args.debs:
+            if Path(deb_file).stat().st_size > 10000000:
+                LOGGER.warning(f"{deb_file} exceeds 100 MB; cannot add to repo")
+            if arch_ == "all":
+                arch = _get_allarch(distributions_text)
+            else:
+                arch = arch_
+            subprocess.run(
+                [
+                    "reprepro",
+                    "--ask-passphrase",
+                    "-C",
+                    component,
+                    "-A",
+                    arch,
+                    "-Vb",
+                    REPO_FILES_LOCATION,
+                    "includedeb",
+                    codename,
+                    deb_file,
+                ],
+                check=True,
+            )
+        new_debs_list = [
+            deb
+            for deb in list_packages_available(codename, REPO_FILES_LOCATION)
+            if deb not in original_debs_list
+        ]
+        if new_debs_list:
+            LOGGER.info("New DEBs added")
+            print(tabulate(new_debs_list, headers="keys"))
+            _update_repo(REPO_FILES_LOCATION)
+        else:
+            LOGGER.warning("No new DEBs added")
+
+    elif args.command == "remove-packages":
+        codename = _get_codename(_get_distributions_text(REPO_FILES_LOCATION))
+        original_debs_list = list_packages_available(codename, REPO_FILES_LOCATION)
+        for package in args.packages:
+            subprocess.run(
+                [
+                    "reprepro",
+                    "-Vb",
+                    REPO_FILES_LOCATION,
+                    "remove",
+                    codename,
+                    package,
+                ],
+                check=True,
+            )
+        removed_debs_list = [
+            deb
+            for deb in original_debs_list
+            if deb not in list_packages_available(codename, REPO_FILES_LOCATION)
+        ]
+        if removed_debs_list:
+            LOGGER.info("DEBs removed")
+            print(tabulate(removed_debs_list, headers="keys"))
+            # Push to GitHub
+            _update_repo(REPO_FILES_LOCATION)
+        else:
+            LOGGER.warning("No DEBs removed")
+
+    elif args.command == "list-packages":
+        codename = _get_codename(_get_distributions_text(REPO_FILES_LOCATION))
+        debs = list_packages_available(codename, REPO_FILES_LOCATION)
+        if debs:
+            if not args.no_format:
+                print(tabulate(debs, headers="keys"))
+            else:
+                for deb in debs:
+                    print(" ".join([v for v in deb.values()]).strip())
+        else:
+            LOGGER.warning(f'No DEBs in repo "{args.name}" yet')
+
+    elif args.command == "clean":
+        # Completely reset the entire repo
+        _update_repo(REPO_FILES_LOCATION, clean=True)
 
     else:
-        with open(os.path.join(REPO_FILES_LOCATION, "conf", "distributions"), "r") as f:
-            distributions_text = f.read()
-
-        CODENAME = re.findall(r"(?<=Codename: ).+", distributions_text)[0]
-        ALL_ARCH = re.findall(r"(?<=Architectures: ).+",
-                              distributions_text)[0].replace(" ", "|")
-
-        with open(REPO_SETTINGS_LOCATION, "r") as f:
-            SETTINGS = yaml.load(f, Loader=yaml.FullLoader)
-
-        if args.command == "serve":
-            container_name = f"apt-repo_{NAME}"
-            if SETTINGS["local"]:
-                if not args.stop:
-                    environment = {
-                        "SERVER_ADMIN_EMAIL": SETTINGS["server_admin_email"],
-                        "USE_SSL": SETTINGS["use_ssl"]
-                    }
-                    if SETTINGS["password"] != "":
-                        environment["REPO_PASSWORD"] = SETTINGS["password"]
-                    client = docker.from_env()
-                    volumes = {
-                        REPO_FILES_LOCATION: {
-                            "bind": os.path.join(os.sep, "usr", "local", "apache2", "htdocs"),
-                            "mode": "ro"
-                        },
-                        APACHE_FILES_LOCATION: {
-                            "bind": os.path.join(os.sep, "usr", "local", "apache2", "mounted"),
-                            "mode": "rw"  # No idea why this is required, but it breaks if not read-write
-                        }
-                    }
-                    if not SETTINGS["use_ssl"]:
-                        ports = {
-                            "80/tcp": SETTINGS["port"]
-                        }
-                    else:
-                        ports = {
-                            "443/tcp": SETTINGS["port"]
-                        }
-                    client.containers.run("apt-repo", name=container_name, auto_remove=True,
-                                          detach=True, ports=ports, volumes=volumes, environment=environment)
-                else:
-                    client = docker.from_env()
-                    client.containers.get(container_name).stop()
-            else:
-                raise ValueError("Cannot serve this repo locally")
-
-        elif args.command == "add_packages":
-            if not os.path.isdir(os.path.join(REPO_FILES_LOCATION, "db")):
-                # First time run edge case
-                original_debs_list = []
-            else:
-                original_debs_list = list_packages_available(
-                    CODENAME, REPO_FILES_LOCATION)
-            for deb_file, component, arch_ in args.deb_files:
-                if os.stat(deb_file).st_size > 10000000 and not SETTINGS["local"]:
-                    LOGGER.warning(
-                        f"{deb_file} exceeds 100 MB; cannot add to repo")
-                if arch_ == "all":
-                    arch = ALL_ARCH
-                else:
-                    arch = arch_
-                try:
-                    subprocess.check_call(["reprepro", "--ask-passphrase", "-C", component,
-                                          "-A", arch, "-Vb", REPO_FILES_LOCATION, "includedeb", CODENAME, deb_file])
-                except subprocess.CalledProcessError as e:
-                    LOGGER.exception("reprepro error")
-            all_debs_list = list_packages_available(
-                CODENAME, REPO_FILES_LOCATION)
-            new_debs_list = [
-                deb for deb in all_debs_list if deb not in original_debs_list]
-            if new_debs_list:
-                LOGGER.info("New DEBs added")
-                print(tabulate(new_debs_list, headers="keys"))
-                if not SETTINGS["local"]:
-                    # Push to GitHub
-                    with zmtools.working_directory(REPO_FILES_LOCATION):
-                        subprocess.check_call(
-                            ["git", "checkout", "-q", "gh-pages"])
-                        subprocess.check_call(["git", "add", "--all"])
-                        subprocess.check_call(
-                            ["git", "commit", "-m", "update repo", "-a"])
-                        subprocess.check_call(
-                            ["git", "push", "origin", "gh-pages"])
-            else:
-                LOGGER.warning("No new DEBs added")
-
-        elif args.command == "remove_packages":
-            original_debs_list = list_packages_available(
-                CODENAME, REPO_FILES_LOCATION)
-            for package in args.packages:
-                subprocess.check_call(
-                    ["reprepro", "-Vb", REPO_FILES_LOCATION, "remove", CODENAME, package])
-            all_debs_list = list_packages_available(
-                CODENAME, REPO_FILES_LOCATION)
-            removed_debs_list = [
-                deb for deb in original_debs_list if deb not in all_debs_list]
-            if removed_debs_list:
-                LOGGER.info("DEBs removed")
-                print(tabulate(removed_debs_list, headers="keys"))
-                if not SETTINGS["local"]:
-                    # Push to GitHub
-                    with zmtools.working_directory(REPO_FILES_LOCATION):
-                        subprocess.check_call(
-                            ["git", "checkout", "-q", "gh-pages"])
-                        subprocess.check_call(["git", "add", "--all"])
-                        subprocess.check_call(
-                            ["git", "commit", "-m", "update repo", "-a"])
-                        subprocess.check_call(
-                            ["git", "push", "origin", "gh-pages"])
-            else:
-                LOGGER.warning("No DEBs removed")
-
-        elif args.command == "list_packages":
-            debs = list_packages_available(CODENAME, REPO_FILES_LOCATION)
-            if debs:
-                if not args.no_format:
-                    print(tabulate(debs, headers="keys"))
-                else:
-                    for deb in debs:
-                        print(" ".join([v for v in deb.values()]).strip())
-            else:
-                LOGGER.warning(f"No DEBs in repo \"{NAME}\" yet")
-        elif args.command == "clean":
-            if SETTINGS["local"]:
-                raise ValueError("Can only clean a repo hosted on GitHub")
-            else:
-                # Completely reset the entire repo
-                with zmtools.working_directory(REPO_FILES_LOCATION):
-                    remote = subprocess.check_output(
-                        ["git", "config", "--get", "remote.origin.url"]).decode().strip()
-                    shutil.rmtree(".git")
-                    subprocess.check_call(["git", "init"])
-                    subprocess.check_call(
-                        ["git", "checkout", "-q", "-b", "gh-pages"])
-                    subprocess.check_call(
-                        ["git", "remote", "add", "origin", remote])
-                    subprocess.check_call(["git", "add", "--all"])
-                    subprocess.check_call(
-                        ["git", "commit", "-m", "clean repo", "-a"])
-                    subprocess.check_call(
-                        ["git", "push", "origin", "gh-pages", "--force"])
-        else:
-            parser.print_help()
-            parser.error("Invalid command")
+        parser.print_help()
+        parser.error("Invalid command")
 
     return 0
 
