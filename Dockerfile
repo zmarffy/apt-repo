@@ -26,5 +26,6 @@ RUN apt-get update \
 
 COPY --from=builder /workspace/dist/*.whl /workspace/
 RUN pip install /workspace/*.whl
+RUN rm -rf /workspace/*
 
 ENTRYPOINT [ "sh", "/entrypoint.sh", "apt-repo" ]

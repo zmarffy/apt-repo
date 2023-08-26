@@ -142,14 +142,19 @@ def main() -> int:
     EXIT_CODE = 0
 
     parser = argparse.ArgumentParser()
-
-    parser.add_argument("name")
     parser.add_argument("--verbose", action="store_true")
 
-    subparsers = parser.add_subparsers(dest="command", help="action to take")
+    subparsers = parser.add_subparsers(
+        dest="command", required=True, help="action to take"
+    )
+
+    parent_parser = argparse.ArgumentParser(add_help=False)
+    parent_parser.add_argument("name")
 
     setup_parser = subparsers.add_parser(
-        "setup", help="setup the repo for the first time"
+        "setup",
+        help="setup the repo for the first time",
+        parents=[parent_parser],
     )
     setup_parser.add_argument(
         "--public-key",
@@ -178,7 +183,9 @@ def main() -> int:
     )
 
     add_packages_parser = subparsers.add_parser(
-        "add-packages", help="add DEBs to the repo"
+        "add-packages",
+        help="add DEBs to the repo",
+        parents=[parent_parser],
     )
     add_packages_parser.add_argument(
         "debs",
@@ -188,20 +195,28 @@ def main() -> int:
     )
 
     remove_packages_parser = subparsers.add_parser(
-        "remove-packages", help="remove packages from the repo"
+        "remove-packages",
+        help="remove packages from the repo",
+        parents=[parent_parser],
     )
     remove_packages_parser.add_argument(
         "packages", nargs="+", help="packages to remove"
     )
 
     list_packages_parser = subparsers.add_parser(
-        "list-packages", help="list DEBs in the repo"
+        "list-packages",
+        help="list DEBs in the repo",
+        parents=[parent_parser],
     )
     list_packages_parser.add_argument(
         "--no-format", action="store_true", help="do not pretty-print list"
     )
 
-    subparsers.add_parser("clean", help="clean repo by wiping git history")
+    subparsers.add_parser(
+        "clean",
+        help="clean repo by wiping git history",
+        parents=[parent_parser],
+    )
 
     args = parser.parse_args()
 
@@ -339,7 +354,7 @@ def main() -> int:
                     [
                         "reprepro",
                         "--ask-passphrase",
-                        "--nothingiserror" "-C",
+                        "-C",
                         component,
                         "-A",
                         arch,
@@ -377,7 +392,6 @@ def main() -> int:
                 [
                     "reprepro",
                     "-Vb",
-                    "--nothingiserror",
                     REPO_FILES_LOCATION,
                     "remove",
                     codename,
@@ -419,10 +433,6 @@ def main() -> int:
     elif args.command == "clean":
         # Completely reset the entire repo
         _update_repo(REPO_FILES_LOCATION, clean=True)
-
-    else:
-        parser.print_help()
-        parser.error("Invalid command")
 
     return EXIT_CODE
 
