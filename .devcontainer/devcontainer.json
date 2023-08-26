@@ -1,0 +1,16 @@
+{
+	"build": {
+		"dockerfile": "../Dockerfile"
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.black-formatter",
+				"ms-python.isort",
+				"ms-azuretools.vscode-docker",
+				"tamasfe.even-better-toml"
+			]
+		}
+	}
+}

@@ -7,9 +7,12 @@ import sys
 from pathlib import Path
 
 import zmtools
+from rich.console import Console
+from rich.logging import RichHandler
 from tabulate import tabulate
 
-LOGGER = logging.getLogger()
+CONSOLE = Console()
+LOGGER = logging.getLogger(__name__)
 
 DISTRIBUTIONS_STRING = """Origin: {}
 Label: {}
@@ -19,6 +22,12 @@ Components: {}
 Description: {}
 SignWith: {}
 """
+GITHUB_FILE_SIZE_LIMIT_BYTES = 10000000
+
+
+def _run_command(*args, **kwargs) -> subprocess.CompletedProcess:
+    LOGGER.debug(f"Running command: {args[0]}")
+    return subprocess.run(*args, **kwargs)
 
 
 def _get_distributions_text(repo_files_location: Path) -> str:
@@ -41,14 +50,14 @@ def _check_exists_and_return_path(p: str) -> Path:
     if path.exists():
         return path
     else:
-        raise FileNotFoundError(p)
+        raise FileNotFoundError(p) from None
 
 
 def _deb_file_transform(s: str) -> tuple[str, str, str]:
     f, c = re.search(r"(.+\.deb$)(?::(.+))?", s).groups()
     a = re.findall(
         "(?<=Architecture: ).+",
-        subprocess.run(["dpkg", "--info", f], capture_output=True, text=True).stdout,
+        _run_command(["dpkg", "--info", f], capture_output=True, text=True).stdout,
     )[0]
     if c is None:
         c = input(f"{f} component: ")
@@ -59,20 +68,43 @@ def _deb_file_transform(s: str) -> tuple[str, str, str]:
 
 def _update_repo(repo_files_location: str, clean: bool = False) -> None:
     with zmtools.working_directory(repo_files_location):
-        remote = subprocess.check_output(
-            ["git", "config", "--get", "remote.origin.url"]
-        )
+        remote = _run_command(
+            ["git", "config", "--get", "remote.origin.url"],
+            check=True,
+            capture_output=True,
+        ).stdout.strip()
         if clean:
-            dash_b = ["-b"]
-            shutil.rmtree(".git")
-            subprocess.run(["git", "init"], check=True)
-            subprocess.run(["git", "remote", "add", "origin", remote], check=True)
+            status_message = "Cleaning repo"
         else:
-            dash_b = []
-        subprocess.run(["git", "checkout", "-q"] + dash_b + ["gh-pages"], check=True)
-        subprocess.run(["git", "add", "--all"], check=True)
-        subprocess.run(["git", "commit", "-m", "update repo", "-a"], check=True)
-        subprocess.run(["git", "push", "origin", "gh-pages", "--force"], check=True)
+            status_message = "Updating repo"
+        with CONSOLE.status(status_message):
+            if clean:
+                dash_b = ["-b"]
+                shutil.rmtree(".git")
+                _run_command(["git", "init"], check=True, capture_output=True)
+                _run_command(
+                    ["git", "remote", "add", "origin", remote],
+                    check=True,
+                    capture_output=True,
+                )
+            else:
+                dash_b = []
+            _run_command(
+                ["git", "checkout", "-q"] + dash_b + ["gh-pages"],
+                check=True,
+                capture_output=True,
+            )
+            _run_command(["git", "add", "--all"], check=True, capture_output=True)
+            _run_command(
+                ["git", "commit", "-m", "update repo", "-a"],
+                check=True,
+                capture_output=True,
+            )
+            _run_command(
+                ["git", "push", "origin", "gh-pages", "--force"],
+                check=True,
+                capture_output=True,
+            )
 
 
 def list_packages_available(
@@ -85,9 +117,9 @@ def list_packages_available(
         repo_files_location (str): Location of the repo files.
 
     Returns:
-        List[Dict[str, str]]: Info about the packages available.
+        list[dict[str, str]]: Info about the packages available.
     """
-    o = subprocess.run(
+    o = _run_command(
         ["reprepro", "-b", repo_files_location, "list", codename],
         capture_output=True,
         text=True,
@@ -107,9 +139,12 @@ def list_packages_available(
 
 
 def main() -> int:
+    EXIT_CODE = 0
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument("name")
+    parser.add_argument("--verbose", action="store_true")
 
     subparsers = parser.add_subparsers(dest="command", help="action to take")
 
@@ -166,23 +201,31 @@ def main() -> int:
         "--no-format", action="store_true", help="do not pretty-print list"
     )
 
-    subparsers.add_parser("clean", help="clean repo (may take a while)")
+    subparsers.add_parser("clean", help="clean repo by wiping git history")
 
     args = parser.parse_args()
+
+    if not args.verbose:
+        log_level = logging.INFO
+    else:
+        log_level = logging.DEBUG
+    logging.basicConfig(
+        level=log_level,
+        format="",
+        handlers=[RichHandler(level=log_level, console=CONSOLE)],
+    )
 
     if args.command is None:
         parser.error("Need to specify a command")
 
     BASE_LOCATION = Path(Path.home(), "apt-repo")
-    REPO_NAME_BASE_LOCATION = Path(BASE_LOCATION, args.name)
+    REPO_FILES_LOCATION = Path(BASE_LOCATION, args.name)
 
     if args.command != "setup":
-        if not REPO_NAME_BASE_LOCATION.is_dir():
+        if not REPO_FILES_LOCATION.is_dir():
             raise FileNotFoundError(
-                f"{REPO_NAME_BASE_LOCATION} does not exist; please run `apt-repo {args.name} setup` first"
-            )
-
-    REPO_FILES_LOCATION = Path(REPO_NAME_BASE_LOCATION, "repo_files")
+                f"{REPO_FILES_LOCATION} does not exist; please run `apt-repo {args.name} setup` first"
+            ) from None
 
     if args.command == "setup":
         # If necessary and the user wants to, completely wipe the repo
@@ -192,11 +235,17 @@ def main() -> int:
             setup_already = False
         if setup_already:
             if zmtools.y_to_continue(
-                f"Repo already set up at {REPO_NAME_BASE_LOCATION}; wipe and start over? (y/n)"
+                f"Repo already set up at {REPO_FILES_LOCATION}; wipe and start over? (y/n)"
             ) and zmtools.y_to_continue(
                 "Are you REALLY sure you want to wipe the repo? There is no going back from this. (y/n)"
             ):
-                shutil.rmtree(REPO_NAME_BASE_LOCATION)
+                shutil.rmtree(REPO_FILES_LOCATION)
+                with CONSOLE.status("Deleting repo"):
+                    _run_command(
+                        ["gh", "repo", "delete", args.name, "--yes"],
+                        check=True,
+                        capture_output=True,
+                    )
             else:
                 sys.exit("Setup aborted")
 
@@ -233,27 +282,41 @@ def main() -> int:
         else:
             repo_type = "public"
         with zmtools.working_directory(REPO_FILES_LOCATION):
-            subprocess.run(["git", "init"], check=True)
-            subprocess.run(
-                [
-                    "gh",
-                    "repo",
-                    "create",
-                    args.name,
-                    f"--{repo_type}",
-                    "--description",
-                    args.description,
-                    "--disable-issues",
-                    "--disable-wiki",
-                    "--source=.",
-                    "--remote=origin",
-                ],
-                check=True,
-            )
-            subprocess.run(["git", "checkout", "-q", "-b", "gh-pages"], check=True)
-            subprocess.run(["git", "add", "--all"], check=True)
-            subprocess.run(["git", "commit", "-m", "set up repo", "-a"], check=True)
-            subprocess.run(["git", "push", "origin", "gh-pages"], check=True)
+            with CONSOLE.status("Creating repo"):
+                _run_command(["git", "init"], check=True, capture_output=True)
+                _run_command(
+                    [
+                        "gh",
+                        "repo",
+                        "create",
+                        args.name,
+                        f"--{repo_type}",
+                        "--description",
+                        args.description,
+                        "--disable-issues",
+                        "--disable-wiki",
+                        "--source=.",
+                        "--remote=origin",
+                    ],
+                    check=True,
+                    capture_output=True,
+                )
+                _run_command(
+                    ["git", "checkout", "-q", "-b", "gh-pages"],
+                    check=True,
+                    capture_output=True,
+                )
+                _run_command(["git", "add", "--all"], check=True, capture_output=True)
+                _run_command(
+                    ["git", "commit", "-m", "set up repo", "-a"],
+                    check=True,
+                    capture_output=True,
+                )
+                _run_command(
+                    ["git", "push", "origin", "gh-pages"],
+                    check=True,
+                    capture_output=True,
+                )
 
     elif args.command == "add-packages":
         distributions_text = _get_distributions_text(REPO_FILES_LOCATION)
@@ -264,28 +327,35 @@ def main() -> int:
         else:
             original_debs_list = list_packages_available(codename, REPO_FILES_LOCATION)
         for deb_file, component, arch_ in args.debs:
-            if Path(deb_file).stat().st_size > 10000000:
-                LOGGER.warning(f"{deb_file} exceeds 100 MB; cannot add to repo")
-            if arch_ == "all":
-                arch = _get_allarch(distributions_text)
-            else:
-                arch = arch_
-            subprocess.run(
-                [
-                    "reprepro",
-                    "--ask-passphrase",
-                    "-C",
-                    component,
-                    "-A",
-                    arch,
-                    "-Vb",
-                    REPO_FILES_LOCATION,
-                    "includedeb",
-                    codename,
-                    deb_file,
-                ],
-                check=True,
-            )
+            try:
+                if Path(deb_file).stat().st_size > GITHUB_FILE_SIZE_LIMIT_BYTES:
+                    EXIT_CODE = 2
+                    LOGGER.warning(f"{deb_file} exceeds 100 MB; cannot add to repo")
+                if arch_ == "all":
+                    arch = _get_allarch(distributions_text)
+                else:
+                    arch = arch_
+                _run_command(
+                    [
+                        "reprepro",
+                        "--ask-passphrase",
+                        "--nothingiserror" "-C",
+                        component,
+                        "-A",
+                        arch,
+                        "-Vb",
+                        REPO_FILES_LOCATION,
+                        "includedeb",
+                        codename,
+                        deb_file,
+                    ],
+                    check=True,
+                )
+            except subprocess.CalledProcessError:
+                LOGGER.exception(
+                    "reprepro error! You may have to resolve the issues by running reprepro commands manually"
+                )
+                EXIT_CODE = 2
         new_debs_list = [
             deb
             for deb in list_packages_available(codename, REPO_FILES_LOCATION)
@@ -297,22 +367,29 @@ def main() -> int:
             _update_repo(REPO_FILES_LOCATION)
         else:
             LOGGER.warning("No new DEBs added")
+            EXIT_CODE = 1
 
     elif args.command == "remove-packages":
         codename = _get_codename(_get_distributions_text(REPO_FILES_LOCATION))
         original_debs_list = list_packages_available(codename, REPO_FILES_LOCATION)
-        for package in args.packages:
-            subprocess.run(
+        try:
+            _run_command(
                 [
                     "reprepro",
                     "-Vb",
+                    "--nothingiserror",
                     REPO_FILES_LOCATION,
                     "remove",
                     codename,
-                    package,
-                ],
+                ]
+                + args.packages,
                 check=True,
             )
+        except subprocess.CalledProcessError:
+            LOGGER.exception(
+                "reprepro error! You may have to resolve the issues by running reprepro commands manually"
+            )
+            EXIT_CODE = 2
         removed_debs_list = [
             deb
             for deb in original_debs_list
@@ -325,6 +402,7 @@ def main() -> int:
             _update_repo(REPO_FILES_LOCATION)
         else:
             LOGGER.warning("No DEBs removed")
+            EXIT_CODE = 2
 
     elif args.command == "list-packages":
         codename = _get_codename(_get_distributions_text(REPO_FILES_LOCATION))
@@ -336,7 +414,7 @@ def main() -> int:
                 for deb in debs:
                     print(" ".join([v for v in deb.values()]).strip())
         else:
-            LOGGER.warning(f'No DEBs in repo "{args.name}" yet')
+            LOGGER.info(f'No DEBs in repo "{args.name}" yet')
 
     elif args.command == "clean":
         # Completely reset the entire repo
@@ -346,7 +424,7 @@ def main() -> int:
         parser.print_help()
         parser.error("Invalid command")
 
-    return 0
+    return EXIT_CODE
 
 
 if __name__ == "__main__":

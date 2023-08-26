@@ -1,4 +1,4 @@
-FROM zmarffy/pybuilder:lite-3.11 AS builder
+FROM zmarffy/pybuilder:3.11 AS builder
 
 COPY . /workspace/
 WORKDIR /workspace
@@ -6,8 +6,7 @@ RUN poetry build
 
 FROM python:3.11
 
-COPY --from=builder /workspace/dist/*.whl /workspace/
-RUN pip install /workspace/*.whl
+LABEL maintainer="zmarffy@yahoo.com"
 
 ENV GH_TOKEN=
 ENV GIT_USERNAME=
@@ -24,5 +23,8 @@ RUN apt-get update \
     reprepro \
     gh \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /workspace/dist/*.whl /workspace/
+RUN pip install /workspace/*.whl
 
 ENTRYPOINT [ "sh", "/entrypoint.sh", "apt-repo" ]
