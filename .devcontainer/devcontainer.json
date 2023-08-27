@@ -3,7 +3,16 @@
 		"dockerfile": "../Dockerfile",
 		"target": "image"
 	},
-	"postCreateCommand": "pip install -e .",
+	"containerEnv": {
+		"GH_TOKEN": "${localEnv:GH_TOKEN}",
+		"GIT_USERNAME": "${localEnv:GIT_USERNAME}",
+		"GIT_EMAIL": "${localEnv:GIT_EMAIL}"
+	},
+	"mounts": [
+		"source=${localEnv:HOME}/.gnupg,target=/root/.gnupg,type=bind,consistency=cached"
+	],	
+	"postCreateCommand": "bash .devcontainer/post_create.sh",
+	"postStartCommand": "bash .devcontainer/post_start.sh",
 	"customizations": {
 		"vscode": {
 			"extensions": [
