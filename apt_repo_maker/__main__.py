@@ -26,7 +26,7 @@ GITHUB_FILE_SIZE_LIMIT_BYTES = 10000000
 
 
 def _run_command(*args, **kwargs) -> subprocess.CompletedProcess:
-    LOGGER.debug(f"Running command: {args[0]}")
+    LOGGER.debug(f"Running command: {subprocess.list2cmdline(args[0])}")
     return subprocess.run(*args, **kwargs)
 
 

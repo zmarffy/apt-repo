@@ -1,5 +1,9 @@
 {
-	"image": "mcr.microsoft.com/devcontainers/python:3.11-buster",
+	"build": {
+		"dockerfile": "../Dockerfile",
+		"target": "image"
+	},
+	"postCreateCommand": "pip install -e .",
 	"customizations": {
 		"vscode": {
 			"extensions": [
