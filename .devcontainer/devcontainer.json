@@ -1,12 +1,11 @@
 {
 	"build": {
 		"dockerfile": "../Dockerfile",
-		"target": "image"
+		"target": "dev_image"
 	},
 	"containerEnv": {
 		"GH_TOKEN": "${localEnv:GH_TOKEN}",
-		"GIT_USERNAME": "${localEnv:GIT_USERNAME}",
-		"GIT_EMAIL": "${localEnv:GIT_EMAIL}"
+		"SET_UP_GITCONFIG": ""
 	},
 	"mounts": [
 		"source=${localEnv:HOME}/.gnupg,target=/root/.gnupg,type=bind,consistency=cached"

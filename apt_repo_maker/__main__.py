@@ -57,7 +57,7 @@ def _deb_file_transform(s: str) -> tuple[str, str, str]:
     f, c = re.search(r"(.+\.deb$)(?::(.+))?", s).groups()
     a = re.findall(
         "(?<=Architecture: ).+",
-        _run_command(["dpkg", "--info", f], capture_output=True, text=True).stdout,
+        _run_command(["dpkg", "--info", f], text=True).stdout,
     )[0]
     if c is None:
         c = input(f"{f} component: ")
@@ -71,40 +71,34 @@ def _update_repo(repo_files_location: str, clean: bool = False) -> None:
         remote = _run_command(
             ["git", "config", "--get", "remote.origin.url"],
             check=True,
-            capture_output=True,
         ).stdout.strip()
         if clean:
             status_message = "Cleaning repo"
         else:
             status_message = "Updating repo"
-        with CONSOLE.status(status_message):
-            if clean:
-                dash_b = ["-b"]
-                shutil.rmtree(".git")
-                _run_command(["git", "init"], check=True, capture_output=True)
-                _run_command(
-                    ["git", "remote", "add", "origin", remote],
-                    check=True,
-                    capture_output=True,
-                )
-            else:
-                dash_b = []
+        if clean:
+            dash_b = ["-b"]
+            shutil.rmtree(".git")
+            _run_command(["git", "init"], check=True)
             _run_command(
-                ["git", "checkout", "-q"] + dash_b + ["gh-pages"],
+                ["git", "remote", "add", "origin", remote],
                 check=True,
-                capture_output=True,
             )
-            _run_command(["git", "add", "--all"], check=True, capture_output=True)
-            _run_command(
-                ["git", "commit", "-m", "update repo", "-a"],
-                check=True,
-                capture_output=True,
-            )
-            _run_command(
-                ["git", "push", "origin", "gh-pages", "--force"],
-                check=True,
-                capture_output=True,
-            )
+        else:
+            dash_b = []
+        _run_command(
+            ["git", "checkout", "-q"] + dash_b + ["gh-pages"],
+            check=True,
+        )
+        _run_command(["git", "add", "--all"], check=True)
+        _run_command(
+            ["git", "commit", "-m", "update repo", "-a"],
+            check=True,
+        )
+        _run_command(
+            ["git", "push", "origin", "gh-pages", "--force"],
+            check=True,
+        )
 
 
 def list_packages_available(
@@ -121,7 +115,6 @@ def list_packages_available(
     """
     o = _run_command(
         ["reprepro", "-b", repo_files_location, "list", codename],
-        capture_output=True,
         text=True,
     ).stdout.strip()
     if o == "":
@@ -255,12 +248,10 @@ def main() -> int:
                 "Are you REALLY sure you want to wipe the repo? There is no going back from this. (y/n)"
             ):
                 shutil.rmtree(REPO_FILES_LOCATION)
-                with CONSOLE.status("Deleting repo"):
-                    _run_command(
-                        ["gh", "repo", "delete", args.name, "--yes"],
-                        check=True,
-                        capture_output=True,
-                    )
+                _run_command(
+                    ["gh", "repo", "delete", args.name, "--yes"],
+                    check=True,
+                )
             else:
                 sys.exit("Setup aborted")
 
@@ -297,41 +288,36 @@ def main() -> int:
         else:
             repo_type = "public"
         with zmtools.working_directory(REPO_FILES_LOCATION):
-            with CONSOLE.status("Creating repo"):
-                _run_command(["git", "init"], check=True, capture_output=True)
-                _run_command(
-                    [
-                        "gh",
-                        "repo",
-                        "create",
-                        args.name,
-                        f"--{repo_type}",
-                        "--description",
-                        args.description,
-                        "--disable-issues",
-                        "--disable-wiki",
-                        "--source=.",
-                        "--remote=origin",
-                    ],
-                    check=True,
-                    capture_output=True,
-                )
-                _run_command(
-                    ["git", "checkout", "-q", "-b", "gh-pages"],
-                    check=True,
-                    capture_output=True,
-                )
-                _run_command(["git", "add", "--all"], check=True, capture_output=True)
-                _run_command(
-                    ["git", "commit", "-m", "set up repo", "-a"],
-                    check=True,
-                    capture_output=True,
-                )
-                _run_command(
-                    ["git", "push", "origin", "gh-pages"],
-                    check=True,
-                    capture_output=True,
-                )
+            _run_command(["git", "init"], check=True)
+            _run_command(
+                [
+                    "gh",
+                    "repo",
+                    "create",
+                    args.name,
+                    f"--{repo_type}",
+                    "--description",
+                    args.description,
+                    "--disable-issues",
+                    "--disable-wiki",
+                    "--source=.",
+                    "--remote=origin",
+                ],
+                check=True,
+            )
+            _run_command(
+                ["git", "checkout", "-q", "-b", "gh-pages"],
+                check=True,
+            )
+            _run_command(["git", "add", "--all"], check=True)
+            _run_command(
+                ["git", "commit", "-m", "set up repo", "-a"],
+                check=True,
+            )
+            _run_command(
+                ["git", "push", "origin", "gh-pages"],
+                check=True,
+            )
 
     elif args.command == "add-packages":
         distributions_text = _get_distributions_text(REPO_FILES_LOCATION)

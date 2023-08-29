@@ -13,7 +13,8 @@ ask_for_env_vars_and_dump_them_to_dotenv()
     done
 }
 
-VARS=("GH_TOKEN" "GIT_USERNAME" "GIT_EMAIL")
+VARS=("GH_TOKEN")
 
 ask_for_env_vars_and_dump_them_to_dotenv
 source "$HOME/.promptedenv"
+sh /entrypoint.sh
