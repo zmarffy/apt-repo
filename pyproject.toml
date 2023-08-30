@@ -1,0 +1,88 @@
+[tool.poetry]
+name = "apt-repo-maker"
+version = "0.0.0"
+description = "Host APT repos on GitHub"
+authors = ["Zeke Marffy <zmarffy@yahoo.com>"]
+packages = [{ include = "apt_repo_maker" }]
+readme = "README.md"
+repository = "https://github.com/zmarffy/apt-repo"
+homepage = "https://github.com/zmarffy/apt-repo"
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.8.1"
+tabulate = "^0.9.0"
+zmtools = "^3.0.1"
+rich = "^13.5.2"
+requests = "^2.31.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.3.0"
+isort = "^5.12.0"
+flake8 = "^6.0.0"
+poethepoet = "^0.19.0"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7.3.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
+build-backend = "poetry_dynamic_versioning.backend"
+
+[tool.black]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+    | _build_files
+)/
+'''
+
+[tool.isort]
+profile = "black"
+skip = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    "_build_files",
+]
+
+[tool.poe.tasks]
+clean = "rm -rf .pytest_cache dist ./**/__pycache__ test-report.xml"
+_black = "black --diff . --check"
+_isort = "isort . -c"
+check-format = ["_black", "_isort"]
+lint = "flake8"
+
+[tool.poetry.scripts]
+apt-repo = "apt_repo_maker.__main__:main"
+
+[tool.poetry-dynamic-versioning]
+enable = true
+metadata = true
+tagged-metadata = true
+dirty = true
+format-jinja = "{% if distance == 0 %}{{ base }}{% else %}{{ base }}+{{ distance }}.{{ commit }}{% endif %}"

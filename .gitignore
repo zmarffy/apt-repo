@@ -1,4 +1,3 @@
-.vagrant/
 .DS_Store
 *.pyc
 *.pyo
@@ -6,6 +5,7 @@
 dist/
 build/
 .vscode/
-.eggs
 __pycache__
-.files
+venv/
+poetry.lock
+test-report.xml

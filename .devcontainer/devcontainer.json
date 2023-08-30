@@ -1,0 +1,27 @@
+{
+	"build": {
+		"dockerfile": "../Dockerfile",
+		"target": "dev_image"
+	},
+	"containerEnv": {
+		"GH_TOKEN": "${localEnv:GH_TOKEN}",
+		"SET_UP_GITCONFIG": ""
+	},
+	"mounts": [
+		"source=${localEnv:HOME}/.gnupg,target=/root/.gnupg,type=bind,consistency=cached"
+	],	
+	"postCreateCommand": "bash .devcontainer/post_create.sh",
+	"postStartCommand": "bash .devcontainer/post_start.sh",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.black-formatter",
+				"ms-python.isort",
+				"ms-azuretools.vscode-docker",
+				"tamasfe.even-better-toml",
+				"njpwerner.autodocstring"
+			]
+		}
+	}
+}
