@@ -20,7 +20,8 @@
 				"ms-python.isort",
 				"ms-azuretools.vscode-docker",
 				"tamasfe.even-better-toml",
-				"njpwerner.autodocstring"
+				"njpwerner.autodocstring",
+				"DavidAnson.vscode-markdownlint"
 			]
 		}
 	}
