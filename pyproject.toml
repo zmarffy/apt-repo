@@ -14,6 +14,7 @@ python = "^3.8.1"
 tabulate = "^0.9.0"
 zmtools = "^3.0.1"
 rich = "^13.5.2"
+requests = "^2.31.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.3.0"

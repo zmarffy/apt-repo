@@ -1,11 +1,15 @@
 import argparse
+from getpass import getpass
 import logging
+import os
 import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
+import requests
 import zmtools
 from rich.console import Console
 from rich.logging import RichHandler
@@ -22,12 +26,22 @@ Components: {}
 Description: {}
 SignWith: {}
 """
+GITHUB_BASE_API_URL = "https://api.github.com"
 GITHUB_FILE_SIZE_LIMIT_BYTES = 10000000
 
 
 def _run_command(*args, **kwargs) -> subprocess.CompletedProcess:
     LOGGER.debug(f"Running command: {subprocess.list2cmdline(args[0])}")
     return subprocess.run(*args, **kwargs)
+
+
+def _get_remote() -> str:
+    return _run_command(
+        ["git", "config", "--get", "remote.origin.url"],
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.strip()
 
 
 def _get_distributions_text(repo_files_location: Path) -> str:
@@ -57,7 +71,7 @@ def _deb_file_transform(s: str) -> tuple[str, str, str]:
     f, c = re.search(r"(.+\.deb$)(?::(.+))?", s).groups()
     a = re.findall(
         "(?<=Architecture: ).+",
-        _run_command(["dpkg", "--info", f], text=True).stdout,
+        _run_command(["dpkg", "--info", f], text=True, capture_output=True, check=True).stdout,
     )[0]
     if c is None:
         c = input(f"{f} component: ")
@@ -68,15 +82,8 @@ def _deb_file_transform(s: str) -> tuple[str, str, str]:
 
 def _update_repo(repo_files_location: str, clean: bool = False) -> None:
     with zmtools.working_directory(repo_files_location):
-        remote = _run_command(
-            ["git", "config", "--get", "remote.origin.url"],
-            check=True,
-        ).stdout.strip()
         if clean:
-            status_message = "Cleaning repo"
-        else:
-            status_message = "Updating repo"
-        if clean:
+            remote = _get_remote()
             dash_b = ["-b"]
             shutil.rmtree(".git")
             _run_command(["git", "init"], check=True)
@@ -101,7 +108,38 @@ def _update_repo(repo_files_location: str, clean: bool = False) -> None:
         )
 
 
-def list_packages_available(
+def github_request(method: str, endpoint: str, token: str, json: Any = None) -> Any:
+    """Return a dict of info about the packages available in the repo.
+
+    Args:
+        codename (str): List packages of this codename.
+        repo_files_location (str): Location of the repo files.
+
+    Returns:
+        list[dict[str, str]]: Info about the packages available.
+    """
+    r = requests.request(
+        method,
+        f"{GITHUB_BASE_API_URL}{endpoint}",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        json=json,
+    )
+    try:
+        r.raise_for_status()
+    except requests.HTTPError:
+        LOGGER.error(r.text)
+        raise
+    if r.text:
+        return r.json()
+    else:
+        return None
+
+
+def list_available(
     codename: str, repo_files_location: str
 ) -> list[dict[str, str]]:
     """Return a dict of info about the packages available in the repo.
@@ -116,6 +154,8 @@ def list_packages_available(
     o = _run_command(
         ["reprepro", "-b", repo_files_location, "list", codename],
         text=True,
+        capture_output=True,
+        check=True,
     ).stdout.strip()
     if o == "":
         # No debs
@@ -175,33 +215,33 @@ def main() -> int:
         "--private", action="store_true", help="make repo private"
     )
 
-    add_packages_parser = subparsers.add_parser(
-        "add-packages",
+    add_parser = subparsers.add_parser(
+        "add",
         help="add DEBs to the repo",
         parents=[parent_parser],
     )
-    add_packages_parser.add_argument(
+    add_parser.add_argument(
         "debs",
         nargs="+",
-        type=lambda x: _deb_file_transform(str(_check_exists_and_return_path(x))),
+        type=_check_exists_and_return_path,
         help="DEB files to add (either just their locations, or <location>:<component>)",
     )
 
-    remove_packages_parser = subparsers.add_parser(
-        "remove-packages",
+    remove_parser = subparsers.add_parser(
+        "remove",
         help="remove packages from the repo",
         parents=[parent_parser],
     )
-    remove_packages_parser.add_argument(
+    remove_parser.add_argument(
         "packages", nargs="+", help="packages to remove"
     )
 
-    list_packages_parser = subparsers.add_parser(
-        "list-packages",
+    list_parser = subparsers.add_parser(
+        "list",
         help="list DEBs in the repo",
         parents=[parent_parser],
     )
-    list_packages_parser.add_argument(
+    list_parser.add_argument(
         "--no-format", action="store_true", help="do not pretty-print list"
     )
 
@@ -235,6 +275,8 @@ def main() -> int:
                 f"{REPO_FILES_LOCATION} does not exist; please run `apt-repo {args.name} setup` first"
             ) from None
 
+    GH_TOKEN = os.getenv("GH_TOKEN") or getpass("Enter GitHub token: ")
+
     if args.command == "setup":
         # If necessary and the user wants to, completely wipe the repo
         try:
@@ -247,11 +289,17 @@ def main() -> int:
             ) and zmtools.y_to_continue(
                 "Are you REALLY sure you want to wipe the repo? There is no going back from this. (y/n)"
             ):
-                shutil.rmtree(REPO_FILES_LOCATION)
-                _run_command(
-                    ["gh", "repo", "delete", args.name, "--yes"],
-                    check=True,
+                with zmtools.working_directory(REPO_FILES_LOCATION):
+                    github_username, github_repo_name_dot_git = _get_remote().split("/", 4)[
+                        3:5
+                    ]
+                github_request(
+                    "DELETE",
+                    f"/repos/{github_username}/{github_repo_name_dot_git.removesuffix('.git')}",
+                    GH_TOKEN,
                 )
+                shutil.rmtree(REPO_FILES_LOCATION)
+
             else:
                 sys.exit("Setup aborted")
 
@@ -283,28 +331,22 @@ def main() -> int:
                     args.private_key,
                 )
             )
-        if args.private:
-            repo_type = "private"
-        else:
-            repo_type = "public"
         with zmtools.working_directory(REPO_FILES_LOCATION):
             _run_command(["git", "init"], check=True)
-            _run_command(
-                [
-                    "gh",
-                    "repo",
-                    "create",
-                    args.name,
-                    f"--{repo_type}",
-                    "--description",
-                    args.description,
-                    "--disable-issues",
-                    "--disable-wiki",
-                    "--source=.",
-                    "--remote=origin",
-                ],
-                check=True,
-            )
+            clone_url = github_request(
+                "POST",
+                "/user/repos",
+                GH_TOKEN,
+                json={
+                    "name": args.name,
+                    "description": args.description,
+                    "private": args.private,
+                    "has_issues": False,
+                    "has_projects": False,
+                    "has_wiki": False,
+                },
+            )["clone_url"]
+            _run_command(["git", "remote", "add", "origin", clone_url], check=True)
             _run_command(
                 ["git", "checkout", "-q", "-b", "gh-pages"],
                 check=True,
@@ -319,15 +361,16 @@ def main() -> int:
                 check=True,
             )
 
-    elif args.command == "add-packages":
+    elif args.command == "add":
+        debs = [_deb_file_transform(str(deb)) for deb in args.debs]
         distributions_text = _get_distributions_text(REPO_FILES_LOCATION)
         codename = _get_codename(distributions_text)
         if not Path(REPO_FILES_LOCATION, "db").is_dir():
             # First time run edge case
             original_debs_list = []
         else:
-            original_debs_list = list_packages_available(codename, REPO_FILES_LOCATION)
-        for deb_file, component, arch_ in args.debs:
+            original_debs_list = list_available(codename, REPO_FILES_LOCATION)
+        for deb_file, component, arch_ in debs:
             try:
                 if Path(deb_file).stat().st_size > GITHUB_FILE_SIZE_LIMIT_BYTES:
                     EXIT_CODE = 2
@@ -359,7 +402,7 @@ def main() -> int:
                 EXIT_CODE = 2
         new_debs_list = [
             deb
-            for deb in list_packages_available(codename, REPO_FILES_LOCATION)
+            for deb in list_available(codename, REPO_FILES_LOCATION)
             if deb not in original_debs_list
         ]
         if new_debs_list:
@@ -370,9 +413,9 @@ def main() -> int:
             LOGGER.warning("No new DEBs added")
             EXIT_CODE = 1
 
-    elif args.command == "remove-packages":
+    elif args.command == "remove":
         codename = _get_codename(_get_distributions_text(REPO_FILES_LOCATION))
-        original_debs_list = list_packages_available(codename, REPO_FILES_LOCATION)
+        original_debs_list = list_available(codename, REPO_FILES_LOCATION)
         try:
             _run_command(
                 [
@@ -393,7 +436,7 @@ def main() -> int:
         removed_debs_list = [
             deb
             for deb in original_debs_list
-            if deb not in list_packages_available(codename, REPO_FILES_LOCATION)
+            if deb not in list_available(codename, REPO_FILES_LOCATION)
         ]
         if removed_debs_list:
             LOGGER.info("DEBs removed")
@@ -404,9 +447,9 @@ def main() -> int:
             LOGGER.warning("No DEBs removed")
             EXIT_CODE = 2
 
-    elif args.command == "list-packages":
+    elif args.command == "list":
         codename = _get_codename(_get_distributions_text(REPO_FILES_LOCATION))
-        debs = list_packages_available(codename, REPO_FILES_LOCATION)
+        debs = list_available(codename, REPO_FILES_LOCATION)
         if debs:
             if not args.no_format:
                 print(tabulate(debs, headers="keys"))
