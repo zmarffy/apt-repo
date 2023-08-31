@@ -71,7 +71,9 @@ def _deb_file_transform(s: str) -> tuple[str, str, str]:
     f, c = re.search(r"(.+\.deb$)(?::(.+))?", s).groups()
     a = re.findall(
         "(?<=Architecture: ).+",
-        _run_command(["dpkg", "--info", f], text=True, capture_output=True, check=True).stdout,
+        _run_command(
+            ["dpkg", "--info", f], text=True, capture_output=True, check=True
+        ).stdout,
     )[0]
     if c is None:
         c = input(f"{f} component: ")
@@ -139,7 +141,7 @@ def github_request(method: str, endpoint: str, token: str, json: Any = None) -> 
         return None
 
 
-def list_available(
+def list_packages_available(
     codename: str, repo_files_location: str
 ) -> list[dict[str, str]]:
     """Return a dict of info about the packages available in the repo.
@@ -171,7 +173,7 @@ def list_available(
         ]
 
 
-def main() -> int:
+def main() -> int:  # noqa: C901
     EXIT_CODE = 0
 
     parser = argparse.ArgumentParser()
@@ -232,9 +234,7 @@ def main() -> int:
         help="remove packages from the repo",
         parents=[parent_parser],
     )
-    remove_parser.add_argument(
-        "packages", nargs="+", help="packages to remove"
-    )
+    remove_parser.add_argument("packages", nargs="+", help="packages to remove")
 
     list_parser = subparsers.add_parser(
         "list",
@@ -290,9 +290,9 @@ def main() -> int:
                 "Are you REALLY sure you want to wipe the repo? There is no going back from this. (y/n)"
             ):
                 with zmtools.working_directory(REPO_FILES_LOCATION):
-                    github_username, github_repo_name_dot_git = _get_remote().split("/", 4)[
-                        3:5
-                    ]
+                    github_username, github_repo_name_dot_git = _get_remote().split(
+                        "/", 4
+                    )[3:5]
                 github_request(
                     "DELETE",
                     f"/repos/{github_username}/{github_repo_name_dot_git.removesuffix('.git')}",
@@ -369,7 +369,7 @@ def main() -> int:
             # First time run edge case
             original_debs_list = []
         else:
-            original_debs_list = list_available(codename, REPO_FILES_LOCATION)
+            original_debs_list = list_packages_available(codename, REPO_FILES_LOCATION)
         for deb_file, component, arch_ in debs:
             try:
                 if Path(deb_file).stat().st_size > GITHUB_FILE_SIZE_LIMIT_BYTES:
@@ -402,7 +402,7 @@ def main() -> int:
                 EXIT_CODE = 2
         new_debs_list = [
             deb
-            for deb in list_available(codename, REPO_FILES_LOCATION)
+            for deb in list_packages_available(codename, REPO_FILES_LOCATION)
             if deb not in original_debs_list
         ]
         if new_debs_list:
@@ -415,7 +415,7 @@ def main() -> int:
 
     elif args.command == "remove":
         codename = _get_codename(_get_distributions_text(REPO_FILES_LOCATION))
-        original_debs_list = list_available(codename, REPO_FILES_LOCATION)
+        original_debs_list = list_packages_available(codename, REPO_FILES_LOCATION)
         try:
             _run_command(
                 [
@@ -436,7 +436,7 @@ def main() -> int:
         removed_debs_list = [
             deb
             for deb in original_debs_list
-            if deb not in list_available(codename, REPO_FILES_LOCATION)
+            if deb not in list_packages_available(codename, REPO_FILES_LOCATION)
         ]
         if removed_debs_list:
             LOGGER.info("DEBs removed")
@@ -449,7 +449,7 @@ def main() -> int:
 
     elif args.command == "list":
         codename = _get_codename(_get_distributions_text(REPO_FILES_LOCATION))
-        debs = list_available(codename, REPO_FILES_LOCATION)
+        debs = list_packages_available(codename, REPO_FILES_LOCATION)
         if debs:
             if not args.no_format:
                 print(tabulate(debs, headers="keys"))

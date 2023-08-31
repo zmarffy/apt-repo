@@ -1,10 +1,10 @@
 # `apt-repo-maker`
 
-`apt-repo-maker` is a program to create and host an APT repo on GitHub. It wraps `reprepro`.
+`apt-repo-maker` is a program to create and host an APT repo on GitHub. Yes, this means committing binaries to a repo, because why not. It wraps `reprepro` with a very simple CLI.
 
 ## Setup
 
-Run apt-repo setup. Usage is as follows.
+Run `apt-repo setup`. Usage is as follows.
 
 ```text
 usage: apt-repo setup [-h] --public-key PUBLIC_KEY --private-key PRIVATE_KEY --description DESCRIPTION --origin ORIGIN --label LABEL --codename CODENAME --arch ARCH [ARCH ...] --component
