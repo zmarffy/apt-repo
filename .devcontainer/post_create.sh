@@ -2,9 +2,6 @@
 
 set -e
 
-POETRY_DYNAMIC_VERSIONING_COMMANDS="" poetry install
-cat << "EOF" >> "$HOME/.bashrc"
-if [ -f "$HOME/.promptedenv" ]; then
-    source "$HOME/.promptedenv"
+if [ ! -d ".venv" ]; then
+    poetry config virtualenvs.in-project true && POETRY_DYNAMIC_VERSIONING_COMMANDS="" poetry install
 fi
-EOF

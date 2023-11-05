@@ -6,6 +6,6 @@ dist/
 build/
 .vscode/
 __pycache__
-venv/
+.venv/
 poetry.lock
 test-report.xml

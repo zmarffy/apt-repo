@@ -1,17 +1,14 @@
 {
 	"build": {
-		"dockerfile": "../Dockerfile",
-		"target": "dev_image"
+		"dockerfile": "Dockerfile"
 	},
 	"containerEnv": {
-		"GH_TOKEN": "${localEnv:GH_TOKEN}",
-		"SET_UP_GITCONFIG": ""
+		"GH_TOKEN": "${localEnv:GH_TOKEN}"
 	},
 	"mounts": [
-		"source=${localEnv:HOME}/.gnupg,target=/root/.gnupg,type=bind,consistency=cached"
-	],	
+		"source=${localEnv:HOME}/.gnupg,target=/root/.gnupg,type=bind,consistency=cached" // TODO: Make this prompted if possible
+	],
 	"postCreateCommand": "bash .devcontainer/post_create.sh",
-	"postStartCommand": "bash .devcontainer/post_start.sh",
 	"customizations": {
 		"vscode": {
 			"extensions": [
@@ -21,7 +18,8 @@
 				"ms-azuretools.vscode-docker",
 				"tamasfe.even-better-toml",
 				"njpwerner.autodocstring",
-				"DavidAnson.vscode-markdownlint"
+				"DavidAnson.vscode-markdownlint",
+				"timonwong.shellcheck"
 			]
 		}
 	}
