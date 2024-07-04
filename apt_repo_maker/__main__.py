@@ -110,16 +110,7 @@ def _update_repo(repo_files_location: str, clean: bool = False) -> None:
         )
 
 
-def github_request(method: str, endpoint: str, token: str, json: Any = None) -> Any:
-    """Return a dict of info about the packages available in the repo.
-
-    Args:
-        codename (str): List packages of this codename.
-        repo_files_location (str): Location of the repo files.
-
-    Returns:
-        list[dict[str, str]]: Info about the packages available.
-    """
+def _github_request(method: str, endpoint: str, token: str, json: Any = None) -> Any:
     r = requests.request(
         method,
         f"{GITHUB_BASE_API_URL}{endpoint}",
@@ -293,7 +284,7 @@ def main() -> int:  # noqa: C901
                     github_username, github_repo_name_dot_git = _get_remote().split(
                         "/", 4
                     )[3:5]
-                github_request(
+                _github_request(
                     "DELETE",
                     f"/repos/{github_username}/{github_repo_name_dot_git.removesuffix('.git')}",
                     GH_TOKEN,
@@ -333,7 +324,7 @@ def main() -> int:  # noqa: C901
             )
         with zmtools.working_directory(REPO_FILES_LOCATION):
             _run_command(["git", "init"], check=True)
-            clone_url = github_request(
+            clone_url = _github_request(
                 "POST",
                 "/user/repos",
                 GH_TOKEN,
