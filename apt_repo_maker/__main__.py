@@ -59,8 +59,9 @@ def _get_allarch(distributions_text: str) -> str:
     )
 
 
-def _check_exists_and_return_path(p: str) -> Path:
-    path = Path(p)
+def _check_exists_and_return_path(p: str) -> tuple[Path, dict[str, Any]]:
+    f = re.search(r"(.+\.deb)(?::(.+))?$", p).group(1)
+    path = Path(f)
     if path.exists():
         return path
     else:
@@ -68,7 +69,7 @@ def _check_exists_and_return_path(p: str) -> Path:
 
 
 def _deb_file_transform(s: str) -> tuple[str, str, str]:
-    f, c = re.search(r"(.+\.deb$)(?::(.+))?", s).groups()
+    f, c = re.search(r"(.+\.deb)(?::(.+))?$", s).groups()
     a = re.findall(
         "(?<=Architecture: ).+",
         _run_command(
